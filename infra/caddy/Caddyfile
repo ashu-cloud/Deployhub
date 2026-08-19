@@ -1,0 +1,8 @@
+{
+    admin 0.0.0.0:2019
+}
+
+# The default route for any unhandled domains
+:80 {
+    respond "DeployHub Platform - Domain not found" 404
+}
