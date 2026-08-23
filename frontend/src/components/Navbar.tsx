@@ -79,7 +79,13 @@ export default function Navbar() {
 
       </div>
 
-      <div className="flex items-center gap-4 animate-fade-up stagger-1">
+      <div className="flex items-center gap-3 md:gap-4 animate-fade-up stagger-1">
+        {/* Creator Badge */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-high doodle-border text-xs font-mono text-sketch-white transform -rotate-1 hover:rotate-0 transition-transform">
+          <span className="text-primary font-bold">⚡ by</span>
+          <span className="font-bold text-sketch-white">Ashu Panchal</span>
+        </div>
+
         {/* GitHub Star button */}
         <a
           href="https://github.com"
@@ -93,7 +99,6 @@ export default function Navbar() {
           <span>Star</span>
         </a>
 
-
         {/* Login CTA */}
         <Link
           href="/login"
@@ -101,6 +106,7 @@ export default function Navbar() {
         >
           Sign In
         </Link>
+
 
         {/* Primary Deploy App Button (Commented Out) */}
         {/* <Link

@@ -64,20 +64,10 @@ export default function DeploymentDetailPage() {
     validate();
   }, [projectId]);
 
-  if (isNotFound) {
-    return <NotFound />;
-  }
-
-  if (loading) {
-    return (
-      <div className="bg-background min-h-screen flex items-center justify-center font-mono text-xs text-outline paper-texture">
-        <span className="animate-spin text-primary text-base mr-2">⚡</span> Connecting to deployment stream...
-      </div>
-    );
-  }
-
   // Connect to live WebSocket with fallback to simulated streaming
   useEffect(() => {
+    if (isNotFound) return;
+
     let ws: WebSocket | null = null;
     let fallbackInterval: NodeJS.Timeout | null = null;
 
@@ -137,14 +127,26 @@ export default function DeploymentDetailPage() {
       if (ws) ws.close();
       if (fallbackInterval) clearInterval(fallbackInterval);
     };
-  }, [deploymentId]);
-
+  }, [deploymentId, isNotFound]);
 
   useEffect(() => {
     if (autoScroll && logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
+
+  if (isNotFound) {
+    return <NotFound />;
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-background min-h-screen flex items-center justify-center font-mono text-xs text-outline paper-texture">
+        <span className="animate-spin text-primary text-base mr-2">⚡</span> Connecting to deployment stream...
+      </div>
+    );
+  }
+
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col md:flex-row relative overflow-x-hidden paper-texture">
@@ -163,10 +165,11 @@ export default function DeploymentDetailPage() {
             AP
           </div>
           <div>
-            <h2 className="text-xs font-mono font-bold text-sketch-white">Workspace</h2>
-            <p className="text-[10px] font-mono text-outline">Production</p>
+            <h2 className="text-xs font-mono font-bold text-sketch-white">Ashu Panchal</h2>
+            <p className="text-[10px] font-mono text-outline">@ashupanchal</p>
           </div>
         </div>
+
 
         {/* New Project Button */}
         <Link

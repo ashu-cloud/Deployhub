@@ -9,7 +9,7 @@ export default function Footer() {
         <div className="md:col-span-2 space-y-4">
           <DeployHubLogo className="h-10" />
           <p className="text-on-surface-variant text-sm font-body-md max-w-sm">
-            The autonomous, container-native deployment platform. Ship code to custom domains with real-time logs and atomic rollbacks.
+            The autonomous, container-native deployment platform. Architected &amp; crafted by <strong className="text-sketch-white">Ashu Panchal</strong> with real-time logs and atomic rollbacks.
           </p>
           <div className="flex items-center gap-2 font-mono text-xs text-primary">
             <span className="h-2 w-2 rounded-full bg-primary animate-pulse"></span>
@@ -53,27 +53,26 @@ export default function Footer() {
           </h4>
           <ul className="space-y-2 text-on-surface-variant">
             <li><a href="https://github.com" target="_blank" rel="noreferrer" className="hover:text-primary transition-colors">GitHub Repository</a></li>
-            <li><a href="https://discord.com" target="_blank" rel="noreferrer" className="hover:text-primary transition-colors">Discord Community</a></li>
             <li><Link href="/docs" className="hover:text-primary transition-colors">Documentation</Link></li>
-            <li><a href="#" className="hover:text-primary transition-colors">Privacy Policy</a></li>
-            <li><a href="#" className="hover:text-primary transition-colors">Terms of Service</a></li>
+            <li><span className="text-primary font-bold">Creator: Ashu Panchal</span></li>
           </ul>
-
         </div>
       </div>
 
+
       <div className="max-w-6xl mx-auto border-t border-outline-variant/30 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-mono text-outline">
         <div>
-          © {new Date().getFullYear()} DeployHub. Built for developers with high standards.
+          © {new Date().getFullYear()} <strong className="text-sketch-white">DeployHub</strong>. Designed &amp; Engineered by <span className="text-primary font-bold">Ashu Panchal</span>.
         </div>
         <div className="flex gap-4">
           <span>MIT License</span>
           <span>•</span>
-          <span>Zero Telemetry</span>
+          <span>Zero Bloat</span>
           <span>•</span>
           <span>Cloud-Native</span>
         </div>
       </div>
+
     </footer>
   );
 }

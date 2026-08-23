@@ -189,9 +189,14 @@ export default function NotFound() {
               <span>Return to Dashboard</span>
             </Link>
           </div>
+
+          <div className="mt-8 font-mono text-[11px] text-outline">
+            DeployHub — Crafted &amp; Engineered by <span className="text-primary font-bold">Ashu Panchal</span>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
 

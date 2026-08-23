@@ -136,14 +136,14 @@ export default function LoginPage() {
           DeployHub
         </div>
         <div className="text-on-surface-variant mb-2 md:mb-0 text-center">
-          © {new Date().getFullYear()} DeployHub — Crafted with Ink & Code
+          © {new Date().getFullYear()} <strong className="text-sketch-white">DeployHub</strong> — Designed &amp; Engineered by <span className="text-primary font-bold">Ashu Panchal</span>
         </div>
         <nav className="flex gap-4">
-          <Link href="#" className="hover:text-primary transition-colors">Terms</Link>
-          <Link href="#" className="hover:text-primary transition-colors">Privacy</Link>
-          <Link href="#" className="hover:text-primary transition-colors">Status</Link>
+          <Link href="/docs" className="hover:text-primary transition-colors">Docs</Link>
+          <Link href="/#faq" className="hover:text-primary transition-colors">FAQ</Link>
         </nav>
       </footer>
+
     </div>
   );
 }

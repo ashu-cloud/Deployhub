@@ -105,23 +105,8 @@ export default function Home() {
                 <span className="text-tertiary">✦</span>
               </a>
             </div>
-
-            {/* Social proof line */}
-            <div className="flex items-center gap-4 text-xs font-mono text-outline mt-4">
-              <div className="flex -space-x-1.5">
-                {["#10b981", "#FF9900", "#0099FF", "#ffb3b0"].map((c, i) => (
-                  <div
-                    key={i}
-                    className="w-5 h-5 rounded-full border border-surface flex items-center justify-center text-[9px] font-bold text-surface"
-                    style={{ backgroundColor: c }}
-                  >
-                    ✓
-                  </div>
-                ))}
-              </div>
-              <span>Loved by 2,000+ indie hackers & fast-moving engineering teams</span>
-            </div>
           </section>
+
 
           {/* ========================================================================= */}
           {/* 2. INTERACTIVE LIVE HERO SANDBOX (#demo) */}

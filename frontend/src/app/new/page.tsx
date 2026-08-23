@@ -106,10 +106,11 @@ export default function CreateProjectPage() {
             AP
           </div>
           <div>
-            <h2 className="text-xs font-mono font-bold text-sketch-white">Workspace</h2>
-            <p className="text-[10px] font-mono text-outline">Production</p>
+            <h2 className="text-xs font-mono font-bold text-sketch-white">Ashu Panchal</h2>
+            <p className="text-[10px] font-mono text-outline">@ashupanchal</p>
           </div>
         </div>
+
 
         <Link
           href="/new"

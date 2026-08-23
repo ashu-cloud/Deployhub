@@ -75,7 +75,7 @@ export function InteractivePricing() {
                 "Automatic SSL & custom domains",
                 "Instant atomic rollbacks",
                 "10GB MinIO artifact storage",
-                "Community Discord support",
+                "Community & GitHub Discussions support",
               ].map((feat, idx) => (
                 <div key={idx} className="flex items-center gap-2.5 text-on-surface-variant">
                   <SketchCheckIcon className="w-4 h-4 text-primary shrink-0" />
@@ -120,7 +120,7 @@ export function InteractivePricing() {
                 "AI Root-Cause Build Failure Diagnostics",
                 "100GB MinIO artifact storage",
                 "Encrypted environment variables vault",
-                "Custom Slack / Discord webhook alerts",
+                "Custom Slack & webhook alerts",
               ].map((feat, idx) => (
                 <div key={idx} className="flex items-center gap-2.5 text-sketch-white">
                   <SketchCheckIcon className="w-4 h-4 text-primary shrink-0" />
@@ -128,6 +128,7 @@ export function InteractivePricing() {
                 </div>
               ))}
             </div>
+
           </div>
 
           <button className="mt-8 w-full bg-primary text-surface font-mono font-bold text-sm py-3 hover:bg-primary-fixed transition-colors doodle-border-emerald paper-shadow-emerald">

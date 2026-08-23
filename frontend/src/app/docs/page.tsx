@@ -193,9 +193,12 @@ export default function DocsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-transparent border-none outline-hidden text-sketch-white text-xs w-28 md:w-36 placeholder:text-outline"
             />
-            <kbd className="hidden lg:inline-block px-1.5 py-0.5 bg-surface-container-high text-[10px] text-outline rounded border border-outline-variant/50">
-              ⌘K
-            </kbd>
+          </div>
+
+          {/* Creator Badge */}
+          <div className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-high doodle-border text-xs font-mono text-sketch-white transform -rotate-1">
+            <span className="text-primary font-bold">⚡ by</span>
+            <span className="font-bold text-sketch-white">Ashu Panchal</span>
           </div>
 
           <Link
@@ -206,6 +209,7 @@ export default function DocsPage() {
           </Link>
         </div>
       </nav>
+
 
       {/* ========================================================================= */}
       {/* MAIN LAYOUT: SIDEBAR + CONTENT CANVAS */}
@@ -304,6 +308,9 @@ export default function DocsPage() {
 
           {/* Sidebar Footer */}
           <div className="mt-auto border-t-2 border-outline-variant/30 pt-4 px-4 space-y-1 font-mono text-xs text-outline">
+            <div className="text-[11px] text-primary font-bold py-1 px-2">
+              ⚡ Architect: Ashu Panchal
+            </div>
             <a
               href="https://github.com"
               target="_blank"
@@ -636,7 +643,8 @@ export default function DocsPage() {
             </div>
 
             {/* ========================================================================= */}
-            {/* RIGHT ASIDE: CHECKLIST & DISCORD WIDGET */}
+            {/* RIGHT ASIDE: CHECKLIST & HELP WIDGET */}
+
             {/* ========================================================================= */}
             <div className="lg:col-span-4 mt-8 lg:mt-0 relative">
               <div className="sticky top-28 space-y-6">
@@ -698,22 +706,9 @@ export default function DocsPage() {
                       </span>
                     </li>
                   </ul>
-
-                  {/* Need Help CTA */}
-                  <div className="mt-6 border-t-2 border-dashed border-outline-variant/40 pt-4 text-center">
-                    <span className="font-serif text-sm text-sketch-white block mb-2 font-bold">
-                      Need Assistance?
-                    </span>
-                    <a
-                      href="https://discord.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-block bg-primary text-surface font-mono font-bold text-xs px-4 py-2 doodle-border-emerald hover:bg-primary-fixed transition-transform transform hover:scale-105"
-                    >
-                      Join Discord Community ⚡
-                    </a>
-                  </div>
                 </div>
+
+
 
                 {/* Architecture Reference Callout */}
                 <div className="bg-surface-container-low doodle-border p-5 font-mono text-xs text-outline space-y-2">
@@ -738,7 +733,7 @@ export default function DocsPage() {
           <DeployHubLogo className="h-7" />
         </div>
         <div className="text-on-surface-variant mb-2 md:mb-0 text-center">
-          © {new Date().getFullYear()} DeployHub — Crafted with Ink &amp; Code
+          © {new Date().getFullYear()} <strong className="text-sketch-white">DeployHub</strong> — Designed &amp; Engineered by <span className="text-primary font-bold">Ashu Panchal</span>
         </div>
         <nav className="flex gap-4">
           <Link href="/dashboard" className="hover:text-primary transition-colors">
