@@ -23,12 +23,12 @@ export default function Footer() {
             Product
           </h4>
           <ul className="space-y-2 text-on-surface-variant">
-            <li><a href="#demo" className="hover:text-primary transition-colors">Interactive Demo</a></li>
-            <li><a href="#benchmarks" className="hover:text-primary transition-colors">Benchmarks</a></li>
-            <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
+            <li><a href="/#demo" className="hover:text-primary transition-colors">Interactive Demo</a></li>
+            <li><a href="/#benchmarks" className="hover:text-primary transition-colors">Benchmarks</a></li>
+            <li><a href="/#features" className="hover:text-primary transition-colors">Features</a></li>
             {/* <li><a href="#architecture" className="hover:text-primary transition-colors">Architecture</a></li> */}
-            <li><a href="#how-it-works" className="hover:text-primary transition-colors">How It Works</a></li>
-            <li><a href="#faq" className="hover:text-primary transition-colors">FAQ</a></li>
+            <li><Link href="/docs" className="hover:text-primary transition-colors">How It Works (Docs)</Link></li>
+            <li><a href="/#faq" className="hover:text-primary transition-colors">FAQ</a></li>
           </ul>
         </div>
 
@@ -52,12 +52,13 @@ export default function Footer() {
             Connect
           </h4>
           <ul className="space-y-2 text-on-surface-variant">
-            <li><a href="https://github.com" className="hover:text-primary transition-colors">GitHub Repository</a></li>
-            <li><a href="https://discord.com" className="hover:text-primary transition-colors">Discord Community</a></li>
-            <li><a href="#" className="hover:text-primary transition-colors">Documentation</a></li>
+            <li><a href="https://github.com" target="_blank" rel="noreferrer" className="hover:text-primary transition-colors">GitHub Repository</a></li>
+            <li><a href="https://discord.com" target="_blank" rel="noreferrer" className="hover:text-primary transition-colors">Discord Community</a></li>
+            <li><Link href="/docs" className="hover:text-primary transition-colors">Documentation</Link></li>
             <li><a href="#" className="hover:text-primary transition-colors">Privacy Policy</a></li>
             <li><a href="#" className="hover:text-primary transition-colors">Terms of Service</a></li>
           </ul>
+
         </div>
       </div>
 

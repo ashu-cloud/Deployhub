@@ -156,6 +156,15 @@ export default function ProjectOverviewPage() {
           </li>
           <li>
             <Link
+              href="/docs"
+              className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 text-on-surface-variant hover:text-sketch-white hover:bg-surface-container transition-all"
+            >
+              <span>📖</span>
+              <span>Documentation</span>
+            </Link>
+          </li>
+          <li>
+            <Link
               href="/new"
               className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 text-on-surface-variant hover:text-sketch-white hover:bg-surface-container transition-all"
             >
@@ -164,6 +173,7 @@ export default function ProjectOverviewPage() {
             </Link>
           </li>
         </ul>
+
 
 
         <div className="mt-auto border-t-2 border-outline-variant border-dashed pt-4 font-mono text-xs text-outline space-y-2">

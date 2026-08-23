@@ -129,10 +129,11 @@ export default function DashboardPage() {
           {[
             { name: "Dashboard", icon: "⊞", href: "/dashboard" },
             { name: "Deployments", icon: "🚀", href: "/deployhub-web" },
-            { name: "Logs Stream", icon: "⚡", href: "/deployhub-web/deployments/dep-v142" },
             { name: "Import Project", icon: "📦", href: "/new" },
+            { name: "Documentation", icon: "📖", href: "/docs" },
             { name: "Secrets Vault", icon: "🔒", href: "/new" },
           ].map((item) => {
+
             const isActive = item.href === "/dashboard";
             return (
               <li key={item.name} className={isActive ? "rotate-0.5" : ""}>

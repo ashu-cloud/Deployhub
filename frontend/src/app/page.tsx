@@ -309,6 +309,71 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
+            {/* 4-Step Pipeline Overview (Nested Under Features) */}
+            <div className="mt-20 pt-12 border-t-2 border-dashed border-outline-variant/40">
+              <div className="text-center mb-10">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant/60 rounded-full font-mono text-xs text-primary mb-3">
+                  <SketchRocket className="w-4 h-4 text-primary" />
+                  <span>Simple 4-Step Pipeline</span>
+                </div>
+                <h3
+                  className="text-3xl md:text-4xl font-bold text-sketch-white tracking-tight font-serif"
+                  style={{ fontFamily: "var(--font-bricolage)" }}
+                >
+                  From <span className="text-primary sketch-underline">Code</span> to Global Live URL
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {[
+                  {
+                    step: "01",
+                    title: "Push Code",
+                    desc: "Commit to GitHub. Our idempotent webhook listener verifies HMAC signatures and registers the build.",
+                    color: "primary",
+                  },
+                  {
+                    step: "02",
+                    title: "Kafka Queue",
+                    desc: "Pushes are published to a distributed Kafka partition to ensure zero build loss under heavy load.",
+                    color: "tertiary",
+                  },
+                  {
+                    step: "03",
+                    title: "Docker Sandbox",
+                    desc: "An ephemeral runner container builds your app, streams logs, and uploads artifacts to MinIO S3.",
+                    color: "accent-blue",
+                  },
+                  {
+                    step: "04",
+                    title: "Instant Live",
+                    desc: "Caddy registers the live subdomain in <350ms. Your app is online and ready for traffic.",
+                    color: "primary",
+                  },
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-surface-container p-6 rounded-xl doodle-border paper-shadow flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="text-3xl font-extrabold font-mono text-primary/40 block mb-2">
+                        {item.step}
+                      </span>
+                      <h4 className="text-xl font-bold text-sketch-white mb-2 font-serif">
+                        {item.title}
+                      </h4>
+                      <p className="text-on-surface-variant text-xs leading-relaxed">
+                        {item.desc}
+                      </p>
+                    </div>
+                    <div className="mt-6 pt-4 border-t border-outline-variant/30 font-mono text-[11px] text-primary flex items-center gap-1">
+                      <span>✓ Automated</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </section>
 
           {/* ========================================================================= */}
@@ -328,75 +393,9 @@ export default function Home() {
           </section>
 
           {/* ========================================================================= */}
-          {/* 7. "HOW IT WORKS" 4-STEP TIMELINE (#how-it-works) */}
+          {/* 7. DEVELOPER TESTIMONIAL POLAROID WALL (Commented Out) */}
           {/* ========================================================================= */}
-          <section id="how-it-works" className="w-full max-w-6xl mx-auto my-20 px-4 scroll-mt-28">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant/60 rounded-full font-mono text-xs text-primary mb-3">
-                <SketchRocket className="w-4 h-4 text-primary" />
-                <span>Simple 4-Step Pipeline</span>
-              </div>
-              <h2
-                className="text-4xl md:text-5xl font-bold text-sketch-white tracking-tight font-serif"
-                style={{ fontFamily: "var(--font-bricolage)" }}
-              >
-                From <span className="text-primary sketch-underline">Code</span> to Global Live URL
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                {
-                  step: "01",
-                  title: "Push Code",
-                  desc: "Commit to GitHub. Our idempotent webhook listener verifies HMAC signatures and registers the build.",
-                  color: "primary",
-                },
-                {
-                  step: "02",
-                  title: "Kafka Queue",
-                  desc: "Pushes are published to a distributed Kafka partition to ensure zero build loss under heavy load.",
-                  color: "tertiary",
-                },
-                {
-                  step: "03",
-                  title: "Docker Sandbox",
-                  desc: "An ephemeral runner container builds your app, streams logs, and uploads artifacts to MinIO S3.",
-                  color: "accent-blue",
-                },
-                {
-                  step: "04",
-                  title: "Instant Live",
-                  desc: "Caddy registers the live subdomain in <350ms. Your app is online and ready for traffic.",
-                  color: "primary",
-                },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-surface-container p-6 rounded-xl doodle-border paper-shadow flex flex-col justify-between"
-                >
-                  <div>
-                    <span className="text-3xl font-extrabold font-mono text-primary/40 block mb-2">
-                      {item.step}
-                    </span>
-                    <h3 className="text-xl font-bold text-sketch-white mb-2 font-serif">
-                      {item.title}
-                    </h3>
-                    <p className="text-on-surface-variant text-xs leading-relaxed">
-                      {item.desc}
-                    </p>
-                  </div>
-                  <div className="mt-6 pt-4 border-t border-outline-variant/30 font-mono text-[11px] text-primary flex items-center gap-1">
-                    <span>✓ Automated</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* ========================================================================= */}
-          {/* 8. DEVELOPER TESTIMONIAL POLAROID WALL */}
-          {/* ========================================================================= */}
+          {/*
           <section className="w-full max-w-6xl mx-auto my-20 px-4">
             <div className="text-center mb-12">
               <h2
@@ -447,6 +446,8 @@ export default function Home() {
               ))}
             </div>
           </section>
+          */}
+
 
           {/* ========================================================================= */}
           {/* 9. FAQ ACCORDION NOTEBOOK (#faq) */}

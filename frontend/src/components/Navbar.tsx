@@ -5,13 +5,14 @@ import Link from "next/link";
 import { DeployHubLogo } from "./SketchIcons";
 
 const NAV_ITEMS = [
-  { id: "demo", label: "Live Demo", href: "#demo" },
-  { id: "benchmarks", label: "Benchmarks", href: "#benchmarks" },
-  { id: "features", label: "Features", href: "#features" },
-  // { id: "architecture", label: "Architecture", href: "#architecture" },
-  { id: "how-it-works", label: "How It Works", href: "#how-it-works" },
-  { id: "faq", label: "FAQ", href: "#faq" },
+  { id: "demo", label: "Live Demo", href: "/#demo" },
+  { id: "benchmarks", label: "Benchmarks", href: "/#benchmarks" },
+  { id: "features", label: "Features", href: "/#features" },
+  { id: "how-it-works", label: "How It Works", href: "/docs" },
+  { id: "faq", label: "FAQ", href: "/#faq" },
 ];
+
+
 
 export default function Navbar() {
   const [activeSection, setActiveSection] = useState<string>("demo");
@@ -60,7 +61,7 @@ export default function Navbar() {
           {NAV_ITEMS.map((item) => {
             const isActive = activeSection === item.id;
             return (
-              <a
+              <Link
                 key={item.id}
                 href={item.href}
                 onClick={() => handleNavClick(item.id)}
@@ -71,10 +72,11 @@ export default function Navbar() {
                 }`}
               >
                 <span>{item.label}</span>
-              </a>
+              </Link>
             );
           })}
         </div>
+
       </div>
 
       <div className="flex items-center gap-4 animate-fade-up stagger-1">
