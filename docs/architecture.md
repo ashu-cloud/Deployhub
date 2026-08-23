@@ -2,6 +2,10 @@
 
 > A battle-hardened, fail-proof distributed system designed for high throughput, horizontal scalability, and zero-downtime operations.
 
+**Companion Documents:**
+- [Tradeoffs & Design Decisions](tradeoffs_and_decisions.md) - Why we chose this stack.
+- [System Flow Deep Dive](system_flow_deep_dive.md) - Step-by-step trace of critical data paths.
+
 ---
 
 ## Table of Contents

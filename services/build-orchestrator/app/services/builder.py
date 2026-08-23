@@ -66,9 +66,11 @@ class BuilderService:
                 # Stream logs concurrently while waiting for container
                 stream_task = asyncio.create_task(log_streamer.stream_logs(container, deployment_id))
                 exit_code = await docker_runner.wait_and_cleanup(container)
-                await stream_task
+                log_buffer = await stream_task
                 
                 if exit_code != 0:
+                    # Stash log buffer for exception handler
+                    self.current_log_buffer = log_buffer
                     raise Exception(f"Build container exited with code {exit_code}")
                 
                 # 6. Publish Success
@@ -85,6 +87,15 @@ class BuilderService:
                 
         except Exception as e:
             logger.error(f"Build failed for {deployment_id}: {e}")
+            
+            # Trigger AI Diagnosis in the background
+            log_buffer = getattr(self, "current_log_buffer", [])
+            if log_buffer:
+                from app.services.ai_diagnoser import ai_diagnoser
+                asyncio.create_task(
+                    ai_diagnoser.diagnose(str(deployment_id), log_buffer, str(e))
+                )
+                
             # Publish Failure
             fail_event = BuildFailedEvent(
                 deployment_id=deployment_id,

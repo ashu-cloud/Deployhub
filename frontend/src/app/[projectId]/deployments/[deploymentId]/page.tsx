@@ -47,6 +47,8 @@ export default function DeploymentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeStageFilter, setActiveStageFilter] = useState<string | null>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [aiDiagnosis, setAiDiagnosis] = useState<string>('');
+  const [aiStatus, setAiStatus] = useState<'idle' | 'thinking' | 'done'>('idle');
 
   const logContainerRef = useRef<HTMLDivElement>(null);
 
@@ -78,6 +80,20 @@ export default function DeploymentDetailPage() {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          
+          if (data.type === 'ai_start') {
+            setAiStatus('thinking');
+            return;
+          }
+          if (data.type === 'ai_token') {
+            setAiDiagnosis(prev => prev + data.text);
+            return;
+          }
+          if (data.type === 'ai_done') {
+            setAiStatus('done');
+            return;
+          }
+
           const now = new Date();
           const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
 
@@ -455,19 +471,40 @@ export default function DeploymentDetailPage() {
             </h3>
 
             <div className="font-mono text-xs space-y-4">
-              <div className="p-3 bg-surface rounded doodle-border">
-                <div className="text-primary font-bold mb-1">Status: Optimal</div>
-                <p className="text-outline text-[11px] leading-relaxed">
-                  Zero syntax warnings or memory threshold alerts. Container memory peaked at 480MB / 4096MB limit.
-                </p>
-              </div>
+              {aiStatus !== 'idle' ? (
+                <div className="p-4 bg-surface rounded doodle-border">
+                  <div className="flex items-center gap-2 text-primary font-bold mb-3 pb-2 border-b border-outline-variant border-dashed">
+                    <SketchSparkle className="w-4 h-4" />
+                    <span>Llama 3.1 Diagnosis</span>
+                    {aiStatus === 'thinking' && (
+                      <span className="flex items-center gap-1 ml-auto text-outline text-[10px]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
+                        Thinking...
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sketch-white leading-relaxed whitespace-pre-wrap font-sans text-sm">
+                    {aiDiagnosis}
+                    {aiStatus === 'thinking' && <span className="inline-block w-2 h-4 ml-1 bg-primary animate-pulse" />}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="p-3 bg-surface rounded doodle-border">
+                    <div className="text-primary font-bold mb-1">Status: Optimal</div>
+                    <p className="text-outline text-[11px] leading-relaxed">
+                      Zero syntax warnings or memory threshold alerts. Container memory peaked at 480MB / 4096MB limit.
+                    </p>
+                  </div>
 
-              <div className="p-3 bg-surface rounded doodle-border">
-                <div className="text-outline font-bold mb-1">Bundle Size Check</div>
-                <p className="text-outline text-[11px] leading-relaxed">
-                  Next.js output bundle is 1.8MB gzip compressed. MinIO upload verified with SHA256 integrity hash.
-                </p>
-              </div>
+                  <div className="p-3 bg-surface rounded doodle-border">
+                    <div className="text-outline font-bold mb-1">Bundle Size Check</div>
+                    <p className="text-outline text-[11px] leading-relaxed">
+                      Next.js output bundle is 1.8MB gzip compressed. MinIO upload verified with SHA256 integrity hash.
+                    </p>
+                  </div>
+                </>
+              )}
 
               <button
                 type="button"

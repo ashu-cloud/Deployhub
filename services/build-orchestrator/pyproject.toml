@@ -11,7 +11,8 @@ dependencies = [
     "asyncpg",
     "aiokafka",
     "redis",
-    "aiodocker"
+    "aiodocker",
+    "groq"
 ]
 
 [build-system]

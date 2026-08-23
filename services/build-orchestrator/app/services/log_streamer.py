@@ -6,10 +6,11 @@ from app.core.redis import redis_client
 logger = logging.getLogger(__name__)
 
 class LogStreamer:
-    async def stream_logs(self, container, deployment_id: str):
+    async def stream_logs(self, container, deployment_id: str) -> list[str]:
         """Streams stdout/stderr from aiodocker container to Redis Pub/Sub"""
         line_number = 0
         channel = f"build:{deployment_id}:logs"
+        log_buffer = []
         
         logger.info(f"Started streaming logs to Redis channel {channel}")
         
@@ -31,6 +32,7 @@ class LogStreamer:
                     
                 for line in text.splitlines():
                     line_number += 1
+                    log_buffer.append(line)
                     payload = {
                         "line": line,
                         "line_number": line_number,
@@ -41,10 +43,14 @@ class LogStreamer:
                     
         except Exception as e:
             logger.error(f"Error streaming logs for {deployment_id}: {e}")
+            error_line = f"Internal system error: {e}"
+            log_buffer.append(error_line)
             await redis_client.publish(channel, json.dumps({
-                "line": f"Internal system error: {e}",
+                "line": error_line,
                 "line_number": line_number + 1,
                 "ts": datetime.utcnow().isoformat()
             }))
+            
+        return log_buffer
 
 log_streamer = LogStreamer()

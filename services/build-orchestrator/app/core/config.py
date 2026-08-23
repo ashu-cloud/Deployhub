@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     
     GITHUB_API_TOKEN: str = "" # Personal Access Token or GitHub App token for API calls
+    GROQ_API_KEY: str = "" # Groq API Key for AI Diagnosis
     
     BUILD_TIMEOUT_SECONDS: int = 600
     BUILD_MEM_LIMIT: str = "512m"
