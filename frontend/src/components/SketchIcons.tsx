@@ -1,72 +1,118 @@
 import React from "react";
 
-export function DeployHubLogo({ className = "h-8", showText = true }: { className?: string; showText?: boolean }) {
+export function DeployHubLogo({ className = "h-9", showText = true }: { className?: string; showText?: boolean }) {
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      {/* Hand-drawn Cloud / Container Rocket Icon */}
+    <div className={`inline-flex items-center select-none group cursor-pointer ${className}`}>
       <svg
-        viewBox="0 0 48 48"
+        viewBox="0 0 354 84"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="h-full aspect-square text-primary overflow-visible"
+        className="h-full w-auto overflow-visible transition-transform duration-200 group-hover:scale-105"
       >
-        {/* Hand-drawn box background */}
-        <rect
-          x="4"
-          y="6"
-          width="40"
-          height="36"
-          rx="8"
-          className="fill-surface stroke-outline-variant"
-          strokeWidth="2.5"
-          strokeDasharray="120"
-          style={{ strokeLinejoin: "round" }}
-        />
-        {/* Sketchy accent shadow offset */}
-        <path
-          d="M7 43 L42 43 L45 39"
-          className="stroke-primary"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        {/* Rocket / Arrow shooting up */}
-        <path
-          d="M24 12 L33 24 L27 24 L27 34 L21 34 L21 24 L15 24 Z"
-          className="fill-primary stroke-sketch-white"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-        {/* Mini flame / sparkle doodle */}
-        <path
-          d="M24 35 Q22 39 24 41 Q26 39 24 35"
-          className="stroke-tertiary fill-tertiary"
-          strokeWidth="1.5"
-        />
-        {/* Doodle stars around */}
-        <circle cx="10" cy="14" r="1.5" className="fill-tertiary" />
-        <circle cx="38" cy="16" r="1" className="fill-accent-blue" />
+        {/* Technical Blueprint Guide Lines */}
+        <line x1="8" y1="2" x2="8" y2="82" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" opacity="0.35" />
+        <line x1="2" y1="12" x2="352" y2="12" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" opacity="0.25" />
+        <line x1="2" y1="72" x2="352" y2="72" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" opacity="0.25" />
+        <line x1="202" y1="2" x2="202" y2="82" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" opacity="0.35" />
+        <line x1="344" y1="2" x2="344" y2="82" stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" opacity="0.35" />
+
+        {/* Dimension Alignment Crosses */}
+        <path d="M 8 6 L 8 18 M 2 12 L 14 12" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
+        <path d="M 344 6 L 344 18 M 338 12 L 350 12" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
+
+        {/* LEFT PILL: DEPLOY (Filled Emerald) */}
+        <g id="deploy-pill">
+          {/* Shadow sketch */}
+          <rect x="14" y="17" width="182" height="57" rx="14" fill="#022c22" opacity="0.4" />
+          {/* Main filled pill */}
+          <rect
+            x="12"
+            y="14"
+            width="182"
+            height="57"
+            rx="14"
+            fill="#059669"
+            stroke="#10b981"
+            strokeWidth="2.5"
+            style={{ strokeLinejoin: "round" }}
+          />
+          {/* Organic sketch outline */}
+          <path
+            d="M 26 14 Q 100 13 180 14 Q 194 14 194 28 Q 194 57 194 57 Q 194 71 180 71 Q 100 72 26 71 Q 12 71 12 57 Q 12 28 12 28 Q 12 14 26 14 Z"
+            stroke="#34d399"
+            strokeWidth="1.2"
+            fill="none"
+            opacity="0.6"
+          />
+          {/* Corner cross-hatching */}
+          <path d="M 168 16 L 192 40 M 176 16 L 194 34 M 184 16 L 194 26" stroke="#047857" strokeWidth="1.5" strokeLinecap="round" />
+
+          {/* Inky Text "Deploy" */}
+          <text
+            x="103"
+            y="54"
+            textAnchor="middle"
+            fill="#FFFFFF"
+            fontFamily="'Bricolage Grotesque', 'Geist', sans-serif"
+            fontWeight="800"
+            fontSize="36"
+            letterSpacing="-0.5px"
+            style={{ filter: "drop-shadow(1px 2px 0px rgba(0,0,0,0.35))" }}
+          >
+            Deploy
+          </text>
+        </g>
+
+        {/* RIGHT PILL: HUB (Sketched Double Outline) */}
+        <g id="hub-pill">
+          {/* Outer outline */}
+          <rect
+            x="204"
+            y="14"
+            width="134"
+            height="57"
+            rx="14"
+            fill="transparent"
+            stroke="#10b981"
+            strokeWidth="2.5"
+            style={{ strokeLinejoin: "round" }}
+          />
+          {/* Inner sketch outline */}
+          <rect
+            x="209"
+            y="19"
+            width="124"
+            height="47"
+            rx="10"
+            fill="transparent"
+            stroke="#34d399"
+            strokeWidth="1.2"
+            opacity="0.75"
+          />
+          {/* Corner hatch accent */}
+          <path d="M 211 25 L 221 19 M 216 28 L 228 20" stroke="#10b981" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
+
+          {/* Inky Text "Hub" */}
+          <text
+            x="271"
+            y="54"
+            textAnchor="middle"
+            fill="#FFFFFF"
+            fontFamily="'Bricolage Grotesque', 'Geist', sans-serif"
+            fontWeight="800"
+            fontSize="36"
+            letterSpacing="-0.5px"
+            style={{ filter: "drop-shadow(1px 2px 0px rgba(0,0,0,0.45))" }}
+          >
+            Hub
+          </text>
+        </g>
       </svg>
-      {showText && (
-        <div className="flex flex-col">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="text-2xl font-bold tracking-tight text-sketch-white font-serif"
-              style={{ fontFamily: "var(--font-bricolage)" }}
-            >
-              Deploy<span className="text-primary italic">Hub</span>
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 font-mono font-bold bg-primary/20 text-primary border border-primary/40 rounded -rotate-2">
-              v1.0
-            </span>
-          </div>
-          <span className="text-[9px] uppercase tracking-widest text-outline -mt-1 font-mono">
-            Autonomous Cloud
-          </span>
-        </div>
-      )}
     </div>
   );
 }
+
+
 
 export function SketchRocket({ className = "w-6 h-6" }: { className?: string }) {
   return (

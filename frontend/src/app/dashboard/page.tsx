@@ -1,115 +1,60 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DeployHubLogo, SketchRocket, SketchTerminalIcon, SketchLockIcon, SketchSparkle } from "@/components/SketchIcons";
-
-interface ProjectItem {
-  id: string;
-  name: string;
-  desc: string;
-  env: "Prod" | "Staging" | "Dev";
-  status: "Healthy" | "Building" | "Idle" | "Failed";
-  time: string;
-  branch: string;
-  subdomain: string;
-  framework: string;
-}
-
-const INITIAL_PROJECTS: ProjectItem[] = [
-  {
-    id: "1",
-    name: "api-gateway-core",
-    desc: "Main routing cluster & reverse proxy for V2 endpoints.",
-    env: "Prod",
-    status: "Healthy",
-    time: "2m ago",
-    branch: "main",
-    subdomain: "api.deployhub.local",
-    framework: "FastAPI",
-  },
-  {
-    id: "2",
-    name: "frontend-dashboard",
-    desc: "Next.js 15 App Router SPA with sketchbook tokens.",
-    env: "Staging",
-    status: "Building",
-    time: "Just now",
-    branch: "feat/doodle-ui",
-    subdomain: "dash-preview.deployhub.local",
-    framework: "Next.js",
-  },
-  {
-    id: "3",
-    name: "auth-service",
-    desc: "OAuth2 GitHub implementation and encrypted token vault.",
-    env: "Prod",
-    status: "Healthy",
-    time: "1h ago",
-    branch: "main",
-    subdomain: "auth.deployhub.local",
-    framework: "Python",
-  },
-  {
-    id: "4",
-    name: "build-orchestrator",
-    desc: "aiodocker worker runner with Kafka consumer group.",
-    env: "Prod",
-    status: "Healthy",
-    time: "3h ago",
-    branch: "main",
-    subdomain: "orchestrator.deployhub.local",
-    framework: "Docker",
-  },
-  {
-    id: "5",
-    name: "docs-portal",
-    desc: "Static documentation site generated with Astro.",
-    env: "Dev",
-    status: "Idle",
-    time: "1d ago",
-    branch: "docs-v2",
-    subdomain: "docs.deployhub.local",
-    framework: "Astro",
-  },
-];
+import { listProjects, createProject, Project } from "@/lib/api";
 
 export default function DashboardPage() {
-  const [projects, setProjects] = useState<ProjectItem[]>(INITIAL_PROJECTS);
+  const router = useRouter();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newRepoUrl, setNewRepoUrl] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const filteredProjects = projects.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.framework.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      const data = await listProjects();
+      setProjects(data);
+      setLoading(false);
+    }
+    load();
+  }, []);
 
-  const handleCreateProject = (e: React.FormEvent) => {
+  const filteredProjects = projects.filter((p) => {
+    const name = p.repo_name || p.id || "";
+    const framework = p.framework || "";
+    return (
+      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      framework.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
+
+  const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProjectName.trim()) return;
 
-    const newProj: ProjectItem = {
-      id: Date.now().toString(),
-      name: newProjectName.toLowerCase().replace(/\s+/g, "-"),
-      desc: newRepoUrl ? `Connected to ${newRepoUrl}` : "New cloud deployment project.",
-      env: "Staging",
-      status: "Building",
-      time: "Just now",
-      branch: "main",
-      subdomain: `${newProjectName.toLowerCase().replace(/\s+/g, "-")}.deployhub.local`,
-      framework: "Next.js",
-    };
+    setIsSubmitting(true);
+    const repoUrl = newRepoUrl.trim() || `https://github.com/ashupanchal/${newProjectName.trim().toLowerCase()}`;
+    const created = await createProject({
+      repo_name: newProjectName.trim(),
+      repo_url: repoUrl,
+    });
 
-    setProjects([newProj, ...projects]);
+    setProjects((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
     setNewProjectName("");
     setNewRepoUrl("");
+    setIsSubmitting(false);
     setShowNewProjectModal(false);
+    router.push(`/${created.id}`);
   };
+
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col md:flex-row relative overflow-x-hidden paper-texture">
@@ -120,13 +65,14 @@ export default function DashboardPage() {
         <Link href="/" className="h-8 wiggle">
           <DeployHubLogo className="h-8" />
         </Link>
-        <button
-          onClick={() => setShowNewProjectModal(true)}
+        <Link
+          href="/new"
           className="doodle-btn bg-primary text-surface font-mono font-bold text-xs px-3 py-1.5"
         >
           + Deploy
-        </button>
+        </Link>
       </header>
+
 
       {/* ========================================================================= */}
       {/* SIDEBAR NAVIGATION (Desktop) */}
@@ -170,28 +116,28 @@ export default function DashboardPage() {
         </div>
 
         {/* New Deployment Button */}
-        <button
-          onClick={() => setShowNewProjectModal(true)}
-          className="w-full doodle-btn bg-primary text-surface font-mono font-bold text-xs py-2.5 flex items-center justify-center gap-2 paper-shadow hover:bg-primary-fixed transition-all -rotate-1 hover:rotate-0 mb-6 cursor-pointer"
+        <Link
+          href="/new"
+          className="w-full doodle-btn bg-primary text-surface font-mono font-bold text-xs py-2.5 flex items-center justify-center gap-2 paper-shadow hover:bg-primary-fixed transition-all -rotate-1 hover:rotate-0 mb-6 cursor-pointer text-center"
         >
           <span className="text-base">+</span>
           <span>Deploy Project</span>
-        </button>
+        </Link>
 
         {/* Nav Links */}
         <ul className="flex flex-col gap-2 flex-grow font-mono text-xs">
           {[
-            { name: "Dashboard", icon: "⊞" },
-            { name: "Deployments", icon: "🚀" },
-            { name: "Logs Stream", icon: "⚡" },
-            { name: "Kafka Events", icon: "☊" },
-            { name: "Secrets Vault", icon: "🔒" },
+            { name: "Dashboard", icon: "⊞", href: "/dashboard" },
+            { name: "Deployments", icon: "🚀", href: "/deployhub-web" },
+            { name: "Logs Stream", icon: "⚡", href: "/deployhub-web/deployments/dep-v142" },
+            { name: "Import Project", icon: "📦", href: "/new" },
+            { name: "Secrets Vault", icon: "🔒", href: "/new" },
           ].map((item) => {
-            const isActive = activeTab === item.name;
+            const isActive = item.href === "/dashboard";
             return (
               <li key={item.name} className={isActive ? "rotate-0.5" : ""}>
-                <button
-                  onClick={() => setActiveTab(item.name)}
+                <Link
+                  href={item.href}
                   className={`w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 transition-all cursor-pointer ${
                     isActive
                       ? "bg-surface-container-high text-primary font-bold doodle-border paper-shadow"
@@ -200,11 +146,12 @@ export default function DashboardPage() {
                 >
                   <span className="text-sm">{item.icon}</span>
                   <span>{item.name}</span>
-                </button>
+                </Link>
               </li>
             );
           })}
         </ul>
+
 
         {/* Bottom Sidebar Utility Links */}
         <div className="mt-auto border-t-2 border-outline-variant border-dashed pt-4 font-mono text-xs text-outline space-y-2">
@@ -274,86 +221,67 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProjects.map((project, idx) => {
               const rotation = idx % 2 === 0 ? "transform -rotate-1 hover:rotate-0" : "transform rotate-1 hover:rotate-0";
-              const isHealthy = project.status === "Healthy";
-              const isBuilding = project.status === "Building";
+              const isLive = project.status === "active";
+              const projName = project.repo_name || project.id;
+              const subdomain = `${projName.toLowerCase().replace(/[^a-z0-9-]/g, "-")}.deployhub.dev`;
 
               return (
-                <div
+                <Link
                   key={project.id}
-                  className={`doodle-border bg-surface-container p-6 relative hover:-translate-y-1.5 transition-all cursor-pointer paper-shadow flex flex-col justify-between ${rotation}`}
+                  href={`/${project.id}`}
+                  className={`doodle-border bg-surface-container p-6 relative hover:-translate-y-1.5 transition-all cursor-pointer paper-shadow flex flex-col justify-between block ${rotation}`}
                 >
                   {/* Washi-Tape Badge */}
-                  <div
-                    className={`absolute -top-3 -right-2 text-[10px] font-mono font-bold px-2.5 py-0.5 border border-outline transform rotate-3 rounded ${
-                      project.env === "Prod"
-                        ? "bg-primary text-surface"
-                        : "bg-tertiary text-surface"
-                    }`}
-                  >
-                    {project.env}
+                  <div className="absolute -top-3 -right-2 text-[10px] font-mono font-bold px-2.5 py-0.5 border border-outline transform rotate-3 rounded bg-primary text-surface">
+                    Prod
                   </div>
 
                   <div>
                     <div className="flex justify-between items-start mb-3">
                       <h3 className="text-lg font-bold text-sketch-white font-serif flex items-center gap-2">
-                        <span>{project.name}</span>
+                        <span>{projName}</span>
                       </h3>
                       <span className="text-xs font-mono text-outline">
-                        {project.framework}
+                        {project.framework || "Next.js"}
                       </span>
                     </div>
 
                     <p className="text-xs font-mono text-on-surface-variant mb-6 leading-relaxed">
-                      {project.desc}
+                      {project.repo_url ? `Git: ${project.repo_url}` : "Active cloud deployment cluster"}
                     </p>
                   </div>
 
                   {/* Subdomain & Status Row */}
                   <div className="border-t border-outline-variant/40 pt-4 space-y-2 font-mono text-xs">
                     <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-outline">Live Subdomain:</span>
-                      <a
-                        href={`https://${project.subdomain}`}
-                        onClick={(e) => e.stopPropagation()}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline font-bold flex items-center gap-1"
-                      >
-                        <span>{project.subdomain}</span>
+                      <span className="text-outline">Live URL:</span>
+                      <span className="text-primary font-bold flex items-center gap-1">
+                        <span>{subdomain}</span>
                         <span className="text-[10px]">↗</span>
-                      </a>
+                      </span>
                     </div>
 
                     <div className="flex justify-between items-center pt-1">
                       <div className="flex items-center gap-2">
                         <span
                           className={`w-2.5 h-2.5 rounded-full inline-block ${
-                            isHealthy
-                              ? "bg-primary animate-pulse"
-                              : isBuilding
-                              ? "bg-tertiary animate-spin"
-                              : "bg-outline"
+                            isLive ? "bg-primary animate-pulse" : "bg-tertiary"
                           }`}
                         ></span>
-                        <span
-                          className={`text-[11px] font-bold ${
-                            isHealthy
-                              ? "text-primary"
-                              : isBuilding
-                              ? "text-tertiary"
-                              : "text-outline"
-                          }`}
-                        >
-                          {project.status}
+                        <span className="text-[11px] font-bold text-primary">
+                          {isLive ? "Healthy" : project.status}
                         </span>
                       </div>
-                      <span className="text-[11px] text-outline">{project.time}</span>
+                      <span className="text-[11px] text-outline">
+                        {project.created_at ? new Date(project.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Live"}
+                      </span>
                     </div>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
+
         </section>
       </main>
 

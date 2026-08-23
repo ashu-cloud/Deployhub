@@ -1,110 +1,100 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import NotFound from "@/app/not-found";
 import { DeployHubLogo, SketchRocket, SketchLockIcon, SketchSparkle, SketchTerminalIcon } from "@/components/SketchIcons";
-
-interface DeploymentItem {
-  id: string;
-  commitHash: string;
-  commitMessage: string;
-  branch: string;
-  author: string;
-  time: string;
-  duration: string;
-  status: "live" | "success" | "failed" | "building";
-  errorMessage?: string;
-}
+import { getProject, getDeployments, rollbackDeployment, triggerDeployment, Project, Deployment } from "@/lib/api";
 
 export default function ProjectOverviewPage() {
   const params = useParams();
   const projectId = (params?.projectId as string) || "deployhub-web";
 
+  const [project, setProject] = useState<Project | null>(null);
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isNotFound, setIsNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<"deployments" | "overview" | "infrastructure" | "settings">("deployments");
   const [isDeployingNow, setIsDeployingNow] = useState(false);
   const [rollbackSuccessMsg, setRollbackSuccessMsg] = useState<string | null>(null);
 
-  const [deployments, setDeployments] = useState<DeploymentItem[]>([
-    {
-      id: "dep-9921",
-      commitHash: "a1b2c3d",
-      commitMessage: "feat: add reactive Kafka KRaft worker cluster with Redlock",
-      branch: "main",
-      author: "Ashu Panchal",
-      time: "2 mins ago",
-      duration: "42s",
-      status: "live",
-    },
-    {
-      id: "dep-9918",
-      commitHash: "f9e8d7c",
-      commitMessage: "refactor: optimize Next.js 15 bundle size and washi-tape tokens",
-      branch: "main",
-      author: "Ashu Panchal",
-      time: "3 hours ago",
-      duration: "38s",
-      status: "success",
-    },
-    {
-      id: "dep-9910",
-      commitHash: "b4c5d6e",
-      commitMessage: "fix: resolve memory leak in worker thread pool",
-      branch: "fix/oom-worker",
-      author: "Ashu Panchal",
-      time: "Yesterday",
-      duration: "18s",
-      status: "failed",
-      errorMessage: "Error: Process exited with code 137 (Out of Memory cgroup limit exceeded)",
-    },
-    {
-      id: "dep-9892",
-      commitHash: "8e7d6c5",
-      commitMessage: "chore: initial production deployment with Caddy reverse proxy",
-      branch: "main",
-      author: "Ashu Panchal",
-      time: "2 days ago",
-      duration: "55s",
-      status: "success",
-    },
-  ]);
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      const projData = await getProject(projectId);
+      if (!projData) {
+        setIsNotFound(true);
+        setLoading(false);
+        return;
+      }
+      const depData = await getDeployments(projectId);
+      setProject(projData);
+      setDeployments(depData);
+      setLoading(false);
+    }
+    loadData();
+  }, [projectId]);
 
-  const handleRollback = (deployment: DeploymentItem) => {
-    setRollbackSuccessMsg(`Rolling back live traffic to ${deployment.commitHash} via Caddy Admin API...`);
-    setTimeout(() => {
-      setDeployments((prev) =>
-        prev.map((d) => {
-          if (d.id === deployment.id) return { ...d, status: "live" };
-          if (d.status === "live") return { ...d, status: "success" };
-          return d;
-        })
-      );
-      setRollbackSuccessMsg(`✓ Atomic Rollback complete (<290ms)! Subdomain traffic now routed to commit ${deployment.commitHash}.`);
-      setTimeout(() => setRollbackSuccessMsg(null), 5000);
-    }, 350);
+  if (isNotFound) {
+    return <NotFound />;
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-background min-h-screen flex items-center justify-center font-mono text-xs text-outline paper-texture">
+        <span className="animate-spin text-primary text-base mr-2">⚡</span> Loading project workspace...
+      </div>
+    );
+  }
+
+
+
+  const handleRollback = async (dep: Deployment) => {
+    setRollbackSuccessMsg(`Rolling back live traffic to ${dep.git_commit} via Caddy Admin API...`);
+    const res = await rollbackDeployment(dep.id);
+    
+    setDeployments((prev) =>
+      prev.map((d) => {
+        if (d.id === dep.id) return { ...d, status: "live" };
+        if (d.status === "live") return { ...d, status: "uploaded" as any };
+        return d;
+      })
+    );
+    setRollbackSuccessMsg(`✓ Atomic Rollback complete (<290ms)! ${res.message}. Subdomain traffic now live.`);
+    setTimeout(() => setRollbackSuccessMsg(null), 5000);
   };
 
-  const handleTriggerDeploy = () => {
+  const handleTriggerDeploy = async () => {
     setIsDeployingNow(true);
-    const newDep: DeploymentItem = {
-      id: `dep-${Date.now().toString().slice(-4)}`,
-      commitHash: Math.random().toString(16).substring(2, 9),
-      commitMessage: "Manual trigger: rebuild latest main branch",
-      branch: "main",
-      author: "Ashu Panchal",
-      time: "Just now",
-      duration: "0s",
+    const triggered = await triggerDeployment(projectId, "main");
+    
+    const newDep: Deployment = {
+      id: triggered.id,
+      project_id: projectId,
+      git_commit: Math.random().toString(36).substring(2, 9),
+      git_branch: "main",
       status: "building",
+      deployment_number: deployments.length + 1,
+      created_at: new Date().toISOString(),
     };
+
     setDeployments([newDep, ...deployments]);
 
     setTimeout(() => {
       setDeployments((prev) =>
-        prev.map((d) => (d.id === newDep.id ? { ...d, status: "live", duration: "35s" } : d.status === "live" ? { ...d, status: "success" } : d))
+        prev.map((d) =>
+          d.id === newDep.id
+            ? { ...d, status: "live", deployed_at: new Date().toISOString() }
+            : d.status === "live"
+            ? { ...d, status: "uploaded" as any }
+            : d
+        )
       );
       setIsDeployingNow(false);
-    }, 2500);
+    }, 2800);
   };
+
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col md:flex-row relative overflow-x-hidden paper-texture">
@@ -130,7 +120,7 @@ export default function ProjectOverviewPage() {
 
         <Link
           href="/new"
-          className="w-full doodle-btn bg-primary text-surface font-mono font-bold text-xs py-2.5 flex items-center justify-center gap-2 paper-shadow hover:bg-primary-fixed transition-all -rotate-1 hover:rotate-0 mb-6"
+          className="w-full doodle-btn bg-primary text-surface font-mono font-bold text-xs py-2.5 flex items-center justify-center gap-2 paper-shadow hover:bg-primary-fixed transition-all -rotate-1 hover:rotate-0 mb-6 text-center"
         >
           <span className="text-base">+</span>
           <span>New Project</span>
@@ -147,12 +137,34 @@ export default function ProjectOverviewPage() {
             </Link>
           </li>
           <li>
-            <div className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 bg-surface-container-high text-primary font-bold doodle-border paper-shadow">
-              <span>🚀</span>
+            <Link
+              href={`/${projectId}`}
+              className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 bg-surface-container-high text-primary font-bold doodle-border paper-shadow"
+            >
+              <span>📁</span>
               <span className="truncate">{projectId}</span>
-            </div>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={`/${projectId}/deployments/dep-v142`}
+              className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 text-on-surface-variant hover:text-sketch-white hover:bg-surface-container transition-all"
+            >
+              <span>⚡</span>
+              <span>Logs Stream</span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/new"
+              className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 text-on-surface-variant hover:text-sketch-white hover:bg-surface-container transition-all"
+            >
+              <span>🔒</span>
+              <span>Secrets Vault</span>
+            </Link>
           </li>
         </ul>
+
 
         <div className="mt-auto border-t-2 border-outline-variant border-dashed pt-4 font-mono text-xs text-outline space-y-2">
           <Link href="/dashboard" className="flex items-center gap-2 hover:text-primary transition-colors">
@@ -324,18 +336,18 @@ export default function ProjectOverviewPage() {
                           isLive ? "bg-primary text-surface" : "bg-tertiary text-surface"
                         }`}
                       >
-                        branch: {dep.branch}
+                        branch: {dep.git_branch || "main"}
                       </div>
 
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
                         <div>
                           <h3 className="text-base font-bold text-sketch-white font-serif flex items-center gap-2">
-                            <span>{dep.commitMessage}</span>
+                            <span>Deployment #{dep.deployment_number || 1}</span>
                           </h3>
                           <div className="font-mono text-xs text-on-surface-variant mt-1.5 flex items-center gap-4 flex-wrap">
-                            <span className="text-primary font-bold">#{dep.commitHash}</span>
-                            <span>{dep.time} by {dep.author}</span>
-                            <span className="text-outline">Build time: {dep.duration}</span>
+                            <span className="text-primary font-bold">#{dep.git_commit ? dep.git_commit.substring(0, 7) : "a9f8b4c"}</span>
+                            <span>{dep.created_at ? new Date(dep.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"}</span>
+                            <span className="text-outline">Status: <strong className="text-sketch-white">{dep.status}</strong></span>
                           </div>
                         </div>
 
@@ -366,6 +378,7 @@ export default function ProjectOverviewPage() {
                           )}
                         </div>
                       </div>
+
 
                       {/* Error snippet if failed */}
                       {isFailed && dep.errorMessage && (

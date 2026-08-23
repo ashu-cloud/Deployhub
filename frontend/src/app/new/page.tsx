@@ -19,6 +19,8 @@ const REPOS = [
   { id: "4", name: "ecommerce-vite-react", desc: "Vite React storefront with Tailwind CSS", updated: "5 days ago", framework: "Vite", buildCmd: "npm run build", outDir: "dist" },
 ];
 
+import { createProject } from "@/lib/api";
+
 export default function CreateProjectPage() {
   const router = useRouter();
   const [selectedRepo, setSelectedRepo] = useState(REPOS[0]);
@@ -63,12 +65,25 @@ export default function CreateProjectPage() {
     setShowValues((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleDeploy = () => {
+  const handleDeploy = async () => {
     setIsDeploying(true);
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 800);
+    const envMap: Record<string, string> = {};
+    envVars.forEach((ev) => {
+      envMap[ev.key] = ev.value;
+    });
+
+    const repoUrl = `https://github.com/deployhub/${selectedRepo.name}`;
+    const project = await createProject({
+      repo_name: selectedRepo.name,
+      repo_url: repoUrl,
+      framework,
+      env_vars: envMap,
+    });
+
+    setIsDeploying(false);
+    router.push(`/${project.id}`);
   };
+
 
   const filteredRepos = REPOS.filter((r) =>
     r.name.toLowerCase().includes(searchRepo.toLowerCase())
@@ -115,12 +130,31 @@ export default function CreateProjectPage() {
             </Link>
           </li>
           <li>
-            <div className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 bg-surface-container-high text-primary font-bold doodle-border paper-shadow">
+            <Link
+              href="/deployhub-web"
+              className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 text-on-surface-variant hover:text-sketch-white hover:bg-surface-container transition-all"
+            >
               <span>🚀</span>
+              <span>Deployments</span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/deployhub-web/deployments/dep-v142"
+              className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 text-on-surface-variant hover:text-sketch-white hover:bg-surface-container transition-all"
+            >
+              <span>⚡</span>
+              <span>Logs Stream</span>
+            </Link>
+          </li>
+          <li>
+            <div className="w-full text-left px-3.5 py-2 rounded-lg flex items-center gap-3 bg-surface-container-high text-primary font-bold doodle-border paper-shadow">
+              <span>🔒</span>
               <span>New Deployment</span>
             </div>
           </li>
         </ul>
+
 
         <div className="mt-auto border-t-2 border-outline-variant border-dashed pt-4 font-mono text-xs text-outline space-y-2">
           <Link href="/dashboard" className="flex items-center gap-2 hover:text-primary transition-colors">

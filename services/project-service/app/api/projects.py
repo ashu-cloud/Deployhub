@@ -85,3 +85,59 @@ async def delete_project(
     # Soft delete
     project.status = 'archived'
     await db.commit()
+
+@router.post("/{project_id}/deploy")
+async def trigger_deployment(
+    project_id: UUID,
+    branch: str = "main",
+    commit_sha: str = "a9f8b4c",
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(Project).where(Project.id == project_id, Project.user_id == user_id))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    from app.models import Deployment
+    from app.schemas.events import BuildQueuedEvent
+    from app.core.kafka import kafka_client
+
+    # Count existing deployments to compute deployment_number
+    dep_count_res = await db.execute(select(Deployment).where(Deployment.project_id == project_id))
+    count = len(dep_count_res.scalars().all())
+
+    new_dep = Deployment(
+        project_id=project_id,
+        git_commit=commit_sha,
+        git_branch=branch,
+        status="queued",
+        deployment_number=count + 1
+    )
+    db.add(new_dep)
+    await db.commit()
+    await db.refresh(new_dep)
+
+    event = BuildQueuedEvent(
+        deployment_id=new_dep.id,
+        project_id=project_id,
+        git_commit=commit_sha,
+        git_branch=branch,
+        repo_url=project.repo_url
+    )
+    await kafka_client.send_event(
+        topic="build.queued",
+        value=event.model_dump(mode="json"),
+        key=str(project_id)
+    )
+
+    return {
+        "id": str(new_dep.id),
+        "project_id": str(project_id),
+        "status": "queued",
+        "deployment_number": new_dep.deployment_number,
+        "git_commit": commit_sha,
+        "git_branch": branch,
+        "created_at": new_dep.created_at.isoformat() if new_dep.created_at else None
+    }
+
