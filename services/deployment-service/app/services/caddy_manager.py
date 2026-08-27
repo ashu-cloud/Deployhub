@@ -4,10 +4,26 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+def _build_admin_client(admin_url: str) -> httpx.AsyncClient:
+    """Caddy's admin API is exposed over a Unix socket, never a network port.
+
+    ``CADDY_ADMIN_URL`` of the form ``unix:///path/to.sock`` is translated
+    into an httpx client that dials that socket directly; anything else
+    (e.g. for local, non-Docker development) falls back to a normal
+    base-url HTTP client.
+    """
+    if admin_url.startswith("unix://"):
+        socket_path = admin_url[len("unix://"):]
+        if not socket_path.startswith("/"):
+            socket_path = "/" + socket_path
+        transport = httpx.AsyncHTTPTransport(uds=socket_path)
+        return httpx.AsyncClient(transport=transport, base_url="http://caddy-admin")
+    return httpx.AsyncClient(base_url=admin_url)
+
 class CaddyManager:
     def __init__(self):
         # httpx client for interacting with Caddy's REST Admin API
-        self.client = httpx.AsyncClient(base_url=settings.CADDY_ADMIN_URL)
+        self.client = _build_admin_client(settings.CADDY_ADMIN_URL)
 
     async def add_route(self, subdomain: str, s3_path: str):
         """

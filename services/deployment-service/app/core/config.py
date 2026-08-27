@@ -5,9 +5,16 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://deployhub:password@localhost:5432/deployhub"
     REDIS_URL: str = "redis://localhost:6379/0"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
-    
-    CADDY_ADMIN_URL: str = "http://localhost:2019"
+
+    # Caddy's admin API is not published on any network interface. It is
+    # reachable only over a filesystem-shared Unix socket between the caddy
+    # and deployment-service containers.
+    CADDY_ADMIN_URL: str = "unix:///srv/caddy-admin/admin.sock"
     BASE_DOMAIN: str = "deployhub.dev"
+
+    # RS256: only the public key is needed to verify tokens minted by auth-service.
+    JWT_ALGORITHM: str = "RS256"
+    JWT_PUBLIC_KEY_PATH: str = "/secrets/jwt/public.pem"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

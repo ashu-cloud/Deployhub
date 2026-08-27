@@ -5,9 +5,18 @@ from app.core.config import settings
 
 class EncryptionService:
     def __init__(self):
-        # We need a 32-byte key for AES-256. 
+        if not settings.ENV_VAR_ENCRYPTION_KEY:
+            raise RuntimeError(
+                "ENV_VAR_ENCRYPTION_KEY is not set. Run `python scripts/generate_secrets.py` "
+                "and supply it via the environment -- refusing to start with no encryption key."
+            )
+        # We need a 32-byte key for AES-256.
         # Convert hex string from settings to bytes.
         self.key = bytes.fromhex(settings.ENV_VAR_ENCRYPTION_KEY)
+        if len(self.key) != 32:
+            raise RuntimeError(
+                f"ENV_VAR_ENCRYPTION_KEY must be 32 bytes (64 hex chars) for AES-256, got {len(self.key)} bytes"
+            )
         self.aesgcm = AESGCM(self.key)
 
     def encrypt(self, value: str) -> str:

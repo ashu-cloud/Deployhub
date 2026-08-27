@@ -11,7 +11,9 @@ dependencies = [
     "asyncpg",
     "aiokafka",
     "redis",
-    "httpx"
+    "httpx",
+    "pyjwt",
+    "cryptography"
 ]
 
 [build-system]

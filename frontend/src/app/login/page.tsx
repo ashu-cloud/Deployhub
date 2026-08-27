@@ -1,19 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { DeployHubLogo, SketchLockIcon, SketchSparkle } from "@/components/SketchIcons";
-import { setAuthToken } from "@/lib/api";
 
 export default function LoginPage() {
-  const router = useRouter();
-
-  const handleDevBypass = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setAuthToken("dev-bypass-token-deployhub-production");
-    router.push("/dashboard");
-  };
-
   return (
     <div className="min-h-screen bg-background text-on-surface paper-texture flex flex-col justify-between relative overflow-hidden">
       {/* Decorative Background Doodles (Absolute Positioned) */}
@@ -81,15 +71,6 @@ export default function LoginPage() {
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-3">
-              {/* Dev Bypass Direct Entry */}
-              <button
-                onClick={handleDevBypass}
-                type="button"
-                className="doodle-btn bg-primary text-surface hover:bg-primary-fixed flex items-center justify-center gap-3 py-3.5 px-6 w-full paper-shadow-emerald cursor-pointer font-mono text-sm font-bold transition-all transform -rotate-0.5 hover:rotate-0"
-              >
-                <span>⚡ Dev Bypass: Enter Workspace</span>
-              </button>
-
               {/* GitHub OAuth Flow */}
               <a
                 href="/api/v1/auth/github"

@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import asyncio
 import logging
@@ -14,7 +15,19 @@ from app.schemas.events import BuildCompletedEvent, BuildFailedEvent
 
 logger = logging.getLogger(__name__)
 
+_SAFE_BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
+_SAFE_REPO_URL_RE = re.compile(r"^(https|git)://[A-Za-z0-9._~%/:@-]+$")
+
+
 class BuilderService:
+    @staticmethod
+    def _validate_clone_inputs(repo_url: str, branch: str) -> None:
+        """Reject anything that could be interpreted as a git/CLI flag or path escape."""
+        if not branch or branch.startswith("-") or not _SAFE_BRANCH_RE.match(branch):
+            raise ValueError(f"Refusing to clone: unsafe branch name {branch!r}")
+        if not repo_url or repo_url.startswith("-") or not _SAFE_REPO_URL_RE.match(repo_url):
+            raise ValueError(f"Refusing to clone: unsafe repo_url {repo_url!r}")
+
     async def process_build(self, payload: dict):
         deployment_id = payload.get("deployment_id")
         project_id = payload.get("project_id")
@@ -41,12 +54,16 @@ class BuilderService:
                 # 3. Clone repository
                 work_dir = f"/tmp/builds/{deployment_id}"
                 os.makedirs(work_dir, exist_ok=True)
-                
+
+                self._validate_clone_inputs(repo_url, branch)
+
                 logger.info(f"Cloning {repo_url} branch {branch} to {work_dir}")
                 # For real app, use GitHub API token in URL: https://x-access-token:{token}@github.com/...
-                # In this MVP, we use subprocess to clone public repos
-                process = await asyncio.create_subprocess_shell(
-                    f"git clone --depth 1 -b {branch} {repo_url} {work_dir}",
+                # In this MVP, we clone public repos. Arguments are passed as an
+                # argv list (never through a shell) so a malicious repo_url/branch
+                # cannot inject shell metacharacters or extra git flags.
+                process = await asyncio.create_subprocess_exec(
+                    "git", "clone", "--depth", "1", "-b", branch, "--", repo_url, work_dir,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )

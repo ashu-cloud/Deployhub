@@ -43,58 +43,68 @@ async def receive_webhook(
     if event_type != "push":
         return {"status": "ignored", "reason": "not a push event"}
         
-    # Idempotency check using X-GitHub-Delivery
-    if delivery_id:
-        cache_key = f"webhook:delivery:{delivery_id}"
-        if await redis_client.get(cache_key):
+    # Idempotency check using X-GitHub-Delivery. A plain GET-then-SETEX at the
+    # end of the handler is a check-then-act race: under a parallel replay,
+    # every request observes a cache miss and all of them queue a build. A
+    # single atomic `SET NX` claims the delivery id up front -- only the
+    # request that wins the claim proceeds, everyone else is a duplicate.
+    cache_key = f"webhook:delivery:{delivery_id}" if delivery_id else None
+    if cache_key:
+        claimed = await redis_client.set(cache_key, "1", nx=True, ex=86400)
+        if not claimed:
             return {"status": "ignored_duplicate"}
-    
-    data = json.loads(payload)
-    
-    # 2. Get project from DB
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalars().first()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-        
-    # Extract commit info
-    commit_sha = data.get("after")
-    ref = data.get("ref", "")
-    branch = ref.replace("refs/heads/", "")
-    
-    if not commit_sha or commit_sha == "0000000000000000000000000000000000000000":
-        return {"status": "ignored", "reason": "branch deletion"}
 
-    # 3. Create Deployment record
-    deployment = Deployment(
-        project_id=project_id,
-        git_commit=commit_sha,
-        git_branch=branch,
-        status="queued",
-        deployment_number=1 # In real app, calculate this
-    )
-    db.add(deployment)
-    await db.commit()
-    await db.refresh(deployment)
+    try:
+        data = json.loads(payload)
 
-    # 4. Publish to Kafka
-    event = BuildQueuedEvent(
-        deployment_id=deployment.id,
-        project_id=project_id,
-        git_commit=commit_sha,
-        git_branch=branch,
-        repo_url=project.repo_url
-    )
-    
-    await kafka_client.send_event(
-        topic="build.queued",
-        value=event.model_dump(mode="json"),
-        key=str(project_id)
-    )
+        # 2. Get project from DB
+        result = await db.execute(select(Project).where(Project.id == project_id))
+        project = result.scalars().first()
 
-    if delivery_id:
-        await redis_client.setex(f"webhook:delivery:{delivery_id}", 86400, "1")
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Extract commit info
+        commit_sha = data.get("after")
+        ref = data.get("ref", "")
+        branch = ref.replace("refs/heads/", "")
+
+        if not commit_sha or commit_sha == "0000000000000000000000000000000000000000":
+            return {"status": "ignored", "reason": "branch deletion"}
+
+        # 3. Create Deployment record
+        deployment = Deployment(
+            project_id=project_id,
+            git_commit=commit_sha,
+            git_branch=branch,
+            status="queued",
+            deployment_number=1 # In real app, calculate this
+        )
+        db.add(deployment)
+        await db.commit()
+        await db.refresh(deployment)
+
+        # 4. Publish to Kafka
+        event = BuildQueuedEvent(
+            deployment_id=deployment.id,
+            project_id=project_id,
+            git_commit=commit_sha,
+            git_branch=branch,
+            repo_url=project.repo_url
+        )
+
+        await kafka_client.send_event(
+            topic="build.queued",
+            value=event.model_dump(mode="json"),
+            key=str(project_id)
+        )
+    except Exception:
+        # Release the claim so a legitimate GitHub retry after a transient
+        # failure (DB hiccup, Kafka unavailable, ...) is not permanently
+        # treated as a duplicate.
+        if cache_key:
+            await redis_client.delete(cache_key)
+        raise
 
     # Return 200 immediately
     return {"status": "build_queued", "deployment_id": str(deployment.id)}

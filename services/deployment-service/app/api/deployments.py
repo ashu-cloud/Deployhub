@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from uuid import UUID
@@ -8,6 +8,7 @@ import logging
 
 from app.core.db import get_db, AsyncSessionLocal
 from app.core.redis import redis_client
+from app.core.security import get_current_user, get_current_user_from_token
 from app.models import Deployment
 from app.services.caddy_manager import caddy_manager
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/deployments", tags=["Deployments"])
 
 @router.get("/{project_id}")
-async def get_deployments(project_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_deployments(project_id: UUID, user_id: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Deployment).where(Deployment.project_id == project_id).order_by(Deployment.created_at.desc())
     )
@@ -24,7 +25,7 @@ async def get_deployments(project_id: UUID, db: AsyncSession = Depends(get_db)):
     return deployments
 
 @router.get("/detail/{deployment_id}")
-async def get_deployment_detail(deployment_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_deployment_detail(deployment_id: UUID, user_id: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Deployment).where(Deployment.id == deployment_id))
     deployment = result.scalars().first()
     if not deployment:
@@ -32,7 +33,7 @@ async def get_deployment_detail(deployment_id: UUID, db: AsyncSession = Depends(
     return deployment
 
 @router.post("/{deployment_id}/rollback")
-async def rollback_deployment(deployment_id: UUID, db: AsyncSession = Depends(get_db)):
+async def rollback_deployment(deployment_id: UUID, user_id: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     # 1. Fetch deployment to rollback TO
     result = await db.execute(select(Deployment).where(Deployment.id == deployment_id))
     deployment = result.scalars().first()
@@ -46,7 +47,16 @@ async def rollback_deployment(deployment_id: UUID, db: AsyncSession = Depends(ge
     return {"message": "Rollback successful", "live_url": f"http://{subdomain}.deployhub.dev"}
 
 @router.websocket("/ws/{deployment_id}")
-async def websocket_deployment_logs(websocket: WebSocket, deployment_id: str):
+async def websocket_deployment_logs(websocket: WebSocket, deployment_id: str, token: str | None = Query(default=None)):
+    # Browsers cannot set custom headers on the WebSocket handshake, so the
+    # access token travels as a query parameter and is validated the same
+    # way get_current_user_from_token validates it for HTTP routes.
+    try:
+        get_current_user_from_token(token or "")
+    except Exception:
+        await websocket.close(code=4401)
+        return
+
     await websocket.accept()
     pubsub = redis_client.pubsub()
     channel = f"build:{deployment_id}:logs"
@@ -80,4 +90,3 @@ async def websocket_deployment_logs(websocket: WebSocket, deployment_id: str):
         logger.error(f"WebSocket error for {deployment_id}: {e}")
     finally:
         await pubsub.unsubscribe(channel, status_channel)
-

@@ -21,8 +21,12 @@ class S3Uploader:
             except client.exceptions.ClientError:
                 logger.info(f"Creating bucket {settings.S3_BUCKET_NAME}")
                 await client.create_bucket(Bucket=settings.S3_BUCKET_NAME)
-                
-                # Make bucket public for Caddy to read
+
+                # Deployed static sites must be publicly readable to serve
+                # traffic through Caddy, but that grant is scoped to the
+                # `deployments/*` prefix only -- not the whole bucket -- so
+                # any other prefix added to this bucket later stays private
+                # by default.
                 policy = {
                     "Version": "2012-10-17",
                     "Statement": [
@@ -30,7 +34,7 @@ class S3Uploader:
                             "Effect": "Allow",
                             "Principal": "*",
                             "Action": ["s3:GetObject"],
-                            "Resource": [f"arn:aws:s3:::{settings.S3_BUCKET_NAME}/*"]
+                            "Resource": [f"arn:aws:s3:::{settings.S3_BUCKET_NAME}/deployments/*"]
                         }
                     ]
                 }

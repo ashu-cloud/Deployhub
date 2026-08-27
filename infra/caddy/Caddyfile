@@ -1,5 +1,8 @@
 {
-    admin 0.0.0.0:2019
+    # The admin API is never bound to a network interface. It is reachable
+    # only through a Unix socket shared with deployment-service over a
+    # dedicated volume -- no host port, no container-network exposure.
+    admin unix//srv/caddy-admin/admin.sock
 }
 
 # The default route for any unhandled domains

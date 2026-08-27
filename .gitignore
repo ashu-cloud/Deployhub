@@ -41,6 +41,7 @@ node_modules/
 .env
 .env.local
 .env.*.local
+secrets/
 
 # IDE & OS
 .vscode/

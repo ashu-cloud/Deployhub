@@ -1,4 +1,6 @@
-version: "3.8"
+# Secrets (JWT keypair, WEBHOOK_SECRET, ENV_VAR_ENCRYPTION_KEY, POSTGRES/MINIO
+# passwords) are never hardcoded here. Run `python scripts/generate_secrets.py`
+# once to create ./secrets/jwt/ and a root .env before `docker-compose up`.
 
 services:
   postgres:
@@ -6,7 +8,7 @@ services:
     container_name: deployhub_postgres
     environment:
       POSTGRES_USER: deployhub
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD -- run python scripts/generate_secrets.py}
       POSTGRES_DB: deployhub
     ports:
       - "5432:5432"
@@ -17,6 +19,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - deployhub_network
 
   redis:
     image: redis:7-alpine
@@ -39,7 +43,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD -- run python scripts/generate_secrets.py}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -55,9 +59,11 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "2019:2019" # Admin API
+      # Admin API (:2019) is intentionally NOT published -- it is reachable
+      # only over the Unix socket shared with deployment-service below.
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_admin_socket:/srv/caddy-admin
     networks:
       - deployhub_network
 
@@ -99,9 +105,14 @@ services:
       dockerfile: Dockerfile
     container_name: deployhub_auth_service
     environment:
-      DATABASE_URL: postgresql+asyncpg://deployhub:password@postgres:5432/deployhub
+      DATABASE_URL: postgresql+asyncpg://deployhub:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/deployhub
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-dummy_client_id}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-dummy_client_secret}
+      JWT_PRIVATE_KEY_PATH: /secrets/jwt/private.pem
+      JWT_PUBLIC_KEY_PATH: /secrets/jwt/public.pem
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ./secrets/jwt:/secrets/jwt:ro
     ports:
       - "8001:8001"
     depends_on:
@@ -116,9 +127,15 @@ services:
       dockerfile: Dockerfile
     container_name: deployhub_project_service
     environment:
-      DATABASE_URL: postgresql+asyncpg://deployhub:password@postgres:5432/deployhub
+      DATABASE_URL: postgresql+asyncpg://deployhub:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/deployhub
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Set WEBHOOK_SECRET -- run python scripts/generate_secrets.py}
+      ENV_VAR_ENCRYPTION_KEY: ${ENV_VAR_ENCRYPTION_KEY:?Set ENV_VAR_ENCRYPTION_KEY -- run python scripts/generate_secrets.py}
+      JWT_PUBLIC_KEY_PATH: /secrets/jwt/public.pem
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ./secrets/jwt:/secrets/jwt:ro
     ports:
       - "8002:8002"
     depends_on:
@@ -137,10 +154,14 @@ services:
       dockerfile: Dockerfile
     container_name: deployhub_deployment_service
     environment:
-      DATABASE_URL: postgresql+asyncpg://deployhub:password@postgres:5432/deployhub
+      DATABASE_URL: postgresql+asyncpg://deployhub:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/deployhub
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      CADDY_ADMIN_URL: http://caddy:2019
+      CADDY_ADMIN_URL: unix:///srv/caddy-admin/admin.sock
+      JWT_PUBLIC_KEY_PATH: /secrets/jwt/public.pem
+    volumes:
+      - ./secrets/jwt:/secrets/jwt:ro
+      - caddy_admin_socket:/srv/caddy-admin
     ports:
       - "8006:8006"
     depends_on:
@@ -159,11 +180,11 @@ services:
       dockerfile: Dockerfile
     container_name: deployhub_upload_service
     environment:
-      DATABASE_URL: postgresql+asyncpg://deployhub:password@postgres:5432/deployhub
+      DATABASE_URL: postgresql+asyncpg://deployhub:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/deployhub
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      S3_ENDPOINT: http://minio:9000
+      S3_ENDPOINT_URL: http://minio:9000
       S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadmin123
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
     ports:
       - "8005:8005"
     depends_on:
@@ -180,9 +201,12 @@ services:
       dockerfile: Dockerfile
     container_name: deployhub_build_orchestrator
     environment:
-      DATABASE_URL: postgresql+asyncpg://deployhub:password@postgres:5432/deployhub
+      DATABASE_URL: postgresql+asyncpg://deployhub:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/deployhub
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Optional: set GROQ_API_KEY in your shell environment or .env file to
+      # enable AI build-failure diagnosis. Left unset, that feature no-ops.
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
     ports:
       - "8004:8004"
     volumes:
@@ -202,9 +226,8 @@ volumes:
   redis_data:
   minio_data:
   kafka_data:
+  caddy_admin_socket:
 
 networks:
   deployhub_network:
     driver: bridge
-
-

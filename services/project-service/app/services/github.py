@@ -8,14 +8,18 @@ logger = logging.getLogger(__name__)
 
 class GitHubWebhookService:
     def __init__(self):
-        self.client = httpx.AsyncClient(
-            timeout=10.0,
-            headers={
-                "Authorization": f"Bearer {settings.GITHUB_API_TOKEN}",
-                "Accept": "application/vnd.github.v3+json",
-                "X-GitHub-Api-Version": "2022-11-28"
-            }
-        )
+        headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        # An empty `Bearer ` header value is illegal (httpx raises
+        # LocalProtocolError, which crashed the whole request/connection
+        # instead of a normal 401 from GitHub). Only send the header when a
+        # real token is configured; without one, GitHub API calls simply fail
+        # with 401 and we fall through to the MVP dummy-hook-id path below.
+        if settings.GITHUB_API_TOKEN:
+            headers["Authorization"] = f"Bearer {settings.GITHUB_API_TOKEN}"
+        self.client = httpx.AsyncClient(timeout=10.0, headers=headers)
 
     # Circuit breaker: open after 5 failures, half-open after 30s
     @circuit(failure_threshold=5, recovery_timeout=30, expected_exception=httpx.RequestError)
@@ -45,8 +49,15 @@ class GitHubWebhookService:
             }
         }
         
-        response = await self.client.post(url, json=payload)
-        
+        try:
+            response = await self.client.post(url, json=payload)
+        except httpx.HTTPError as exc:
+            # Covers auth/connection/protocol errors alike (e.g. no
+            # GITHUB_API_TOKEN configured) -- never let a GitHub API hiccup
+            # take down project creation.
+            logger.error(f"GitHub webhook registration request failed: {exc}")
+            return "dummy_hook_id_123"
+
         if response.status_code == 201:
             return str(response.json()["id"])
         

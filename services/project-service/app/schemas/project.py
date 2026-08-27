@@ -1,11 +1,11 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
 
 class ProjectCreate(BaseModel):
-    repo_url: str
-    repo_name: str
+    repo_url: str = Field(..., min_length=1, max_length=500)
+    repo_name: str = Field(..., min_length=1, max_length=255)
 
 class ProjectResponse(BaseModel):
     id: UUID
@@ -19,8 +19,8 @@ class ProjectResponse(BaseModel):
         from_attributes = True
 
 class EnvVarCreate(BaseModel):
-    key: str
-    value: str
+    key: str = Field(..., min_length=1, max_length=255)
+    value: str = Field(..., max_length=65536)
 
 class EnvVarResponse(BaseModel):
     id: UUID
