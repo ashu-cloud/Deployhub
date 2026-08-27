@@ -20,20 +20,27 @@ class DockerRunner:
 
     async def run_build_container(self, project_dir: str, env_vars: list):
         """Runs the build inside an isolated container and returns the container instance for streaming"""
-        # We assume a Node.js environment for MVP (Next.js, React, etc)
-        # In a real app, this image would be dynamically chosen based on framework detection
-        
+        deployment_id = project_dir.rstrip("/").split("/")[-1]
+        if settings.BUILD_VOLUME_NAME:
+            # Sibling containers started via the host docker.sock cannot see
+            # this service's filesystem -- bind the shared named volume.
+            binds = [f"{settings.BUILD_VOLUME_NAME}:/tmp/builds"]
+            working_dir = f"/tmp/builds/{deployment_id}"
+        else:
+            binds = [f"{project_dir}:/app"]
+            working_dir = "/app"
+
         config = {
             "Image": "node:20-alpine",
-            "Cmd": ["sh", "-c", "npm install && npm run build"],
+            "Cmd": ["sh", "-c", "if [ -f package-lock.json ]; then npm ci; else npm install; fi && npm run build"],
             "Env": env_vars,
             "HostConfig": {
                 "Memory": 512 * 1024 * 1024, # 512MB limit
                 "NanoCPUs": int(settings.BUILD_CPU_QUOTA * 1e9 / 100000), # ~1 CPU core
-                "Binds": [f"{project_dir}:/app"],
+                "Binds": binds,
                 "AutoRemove": False # We remove manually after streaming logs
             },
-            "WorkingDir": "/app",
+            "WorkingDir": working_dir,
             "Tty": False,
             "AttachStdout": True,
             "AttachStderr": True,

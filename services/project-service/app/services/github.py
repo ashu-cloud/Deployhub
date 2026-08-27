@@ -35,7 +35,7 @@ class GitHubWebhookService:
         
         # We need a publicly accessible URL for GitHub to reach us.
         # For local dev, this would be a ngrok URL.
-        webhook_url = f"https://api.deployhub.dev/webhooks/github/{project_id}"
+        webhook_url = f"{settings.WEBHOOK_BASE_URL.rstrip('/')}/webhooks/github/{project_id}"
         
         payload = {
             "name": "web",

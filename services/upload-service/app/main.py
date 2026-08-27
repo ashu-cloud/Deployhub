@@ -1,4 +1,6 @@
 import logging
+import os
+import shutil
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
@@ -13,6 +15,15 @@ from app import models
 
 logger = logging.getLogger(__name__)
 
+
+def _artifact_dir(local_build_dir: str) -> str:
+    for name in ("out", "dist", "build"):
+        candidate = os.path.join(local_build_dir, name)
+        if os.path.isdir(candidate) and os.listdir(candidate):
+            return candidate
+    return local_build_dir
+
+
 async def process_build_completed(payload: dict):
     deployment_id = payload.get("deployment_id")
     project_id = payload.get("project_id")
@@ -20,9 +31,6 @@ async def process_build_completed(payload: dict):
     logger.info(f"Processing upload for deployment {deployment_id}")
     
     try:
-        # In this local MVP, the build output is in /tmp/builds/{deployment_id} (if on same machine)
-        # or we assume the build orchestrator packed it and passed a shared path. 
-        # For simplicity, we assume /tmp/builds/{deployment_id} is accessible.
         local_build_dir = f"/tmp/builds/{deployment_id}"
         s3_prefix = f"deployments/{project_id}/{deployment_id}"
         
@@ -34,15 +42,15 @@ async def process_build_completed(payload: dict):
                 deployment.status = 'uploading'
                 await db.commit()
                 
-        # 2. Upload to S3 (MinIO)
-        # Note: If the directory doesn't exist (because we are on a different pod and no shared volume),
-        # this will fail. In a real Kubernetes cluster, we'd use a shared PVC or the Build Orchestrator
-        # would stream the tarball to Kafka/S3 directly. We'll simulate success if dir missing for local MVP.
-        import os
-        if os.path.exists(local_build_dir):
-            await s3_uploader.upload_directory(local_build_dir, s3_prefix)
+        # 2. Upload to S3 (MinIO) from the shared builds volume.
+        if os.path.isdir(local_build_dir):
+            await s3_uploader.upload_directory(_artifact_dir(local_build_dir), s3_prefix)
         else:
-            logger.warning(f"Local build dir {local_build_dir} not found. Simulating upload success for MVP.")
+            logger.error(
+                f"Build dir {local_build_dir} not found on the shared volume; "
+                "upload-service and build-orchestrator must mount the same builds volume."
+            )
+            raise FileNotFoundError(local_build_dir)
             
         # 3. Update status to 'uploaded' and set s3_path
         async with AsyncSessionLocal() as db:
@@ -61,6 +69,7 @@ async def process_build_completed(payload: dict):
         )
         await kafka_client.send_event("deployment.uploaded", event.model_dump(mode="json"), key=project_id)
         logger.info(f"Published deployment.uploaded for {deployment_id}")
+        shutil.rmtree(local_build_dir, ignore_errors=True)
         
     except Exception as e:
         logger.error(f"Upload failed for deployment {deployment_id}: {e}")

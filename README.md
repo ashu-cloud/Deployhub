@@ -46,20 +46,25 @@ The project includes a `docker-compose.yml` for local development.
 pip install cryptography
 python scripts/generate_secrets.py
 
-# Start all dependent services (--env-file feeds docker-compose's ${VAR} substitution)
+# Start backend + infra (--env-file feeds docker-compose's ${VAR} substitution)
 docker-compose --env-file secrets/compose.env up -d --build
 
-# Install backend dependencies
-cd services/project-service
-python -m venv .venv
-source .venv/bin/activate  # (On Windows use: .venv\Scripts\activate)
-pip install -e .
-uvicorn app.main:app --reload --port 8002
-
-# Install frontend dependencies and run Next.js
-cd ../../frontend
+# Frontend on the host (Next.js rewrites /api/v1/* to 127.0.0.1:800x)
+cd frontend
 npm install
 npm run dev
+```
+
+Open http://localhost:3000. GitHub OAuth needs an OAuth App whose **Authorization callback URL** is:
+
+`http://localhost:3000/api/v1/auth/callback`
+
+Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in `secrets/compose.env`, then recreate auth-service.
+
+To run the frontend inside Compose instead of `npm run dev`:
+
+```bash
+docker-compose --env-file secrets/compose.env --profile web up -d --build
 ```
 
 Every service fails fast (refuses to start) if its JWT keys / webhook secret /

@@ -46,8 +46,8 @@ async def test_process_build_success_publishes_completed():
             patch("app.services.builder.docker_runner") as mock_docker,
             patch("app.services.builder.log_streamer") as mock_logs,
             patch("app.services.builder.kafka_client") as mock_kafka,
-            patch("app.services.builder.shutil.rmtree"),
             patch("app.services.builder.os.makedirs"),
+            patch.object(builder_service, "_load_project_env_vars", AsyncMock(return_value=["NODE_ENV=production"])),
         ):
             mock_kafka.send_event = AsyncMock()
             mock_lock.return_value.__aenter__.return_value = AsyncMock()
@@ -91,6 +91,7 @@ async def test_process_build_docker_failure_publishes_failed():
             patch("app.services.builder.log_streamer") as mock_logs,
             patch("app.services.builder.kafka_client") as mock_kafka,
             patch("app.services.builder.os.makedirs"),
+            patch.object(builder_service, "_load_project_env_vars", AsyncMock(return_value=["NODE_ENV=production"])),
         ):
             mock_kafka.send_event = AsyncMock()
             mock_lock.return_value.__aenter__.return_value = AsyncMock()

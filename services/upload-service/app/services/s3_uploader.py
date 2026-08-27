@@ -1,5 +1,6 @@
 import aiobotocore.session
 import logging
+import mimetypes
 import os
 from app.core.config import settings
 
@@ -50,18 +51,20 @@ class S3Uploader:
             aws_secret_access_key=settings.S3_SECRET_KEY
         ) as client:
             
-            for root, _, files in os.walk(local_dir):
+            for root, dirs, files in os.walk(local_dir):
+                dirs[:] = [d for d in dirs if d not in {".git", "node_modules", ".next"}]
                 for file in files:
                     local_path = os.path.join(root, file)
-                    # Calculate relative path to maintain directory structure
                     rel_path = os.path.relpath(local_path, local_dir)
                     s3_key = f"{s3_prefix}/{rel_path}".replace('\\', '/')
-                    
+                    content_type = mimetypes.guess_type(local_path)[0] or "application/octet-stream"
+
                     with open(local_path, 'rb') as data:
                         await client.put_object(
                             Bucket=settings.S3_BUCKET_NAME,
                             Key=s3_key,
-                            Body=data
+                            Body=data,
+                            ContentType=content_type,
                         )
             logger.info(f"Successfully uploaded {local_dir} to s3://{settings.S3_BUCKET_NAME}/{s3_prefix}")
 

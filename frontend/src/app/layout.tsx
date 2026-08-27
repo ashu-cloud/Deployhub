@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Geist, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthSessionProvider } from "@/components/AuthSessionProvider";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -36,7 +37,7 @@ export default function RootLayout({
         className={`${geist.variable} ${bricolage.variable} ${jetbrainsMono.variable} antialiased bg-background text-on-surface paper-texture overflow-x-hidden min-h-screen flex flex-col relative`}
         style={{ fontFamily: "var(--font-geist)" }}
       >
-        {children}
+        <AuthSessionProvider>{children}</AuthSessionProvider>
       </body>
     </html>
   );

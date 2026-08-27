@@ -1,10 +1,10 @@
 import os
 import re
-import shutil
 import asyncio
 import logging
 from sqlalchemy.future import select
 
+from app.core.config import settings
 from app.core.db import AsyncSessionLocal
 from app.core.redis import BuildLock
 from app.core.kafka import kafka_client
@@ -28,11 +28,48 @@ class BuilderService:
         if not repo_url or repo_url.startswith("-") or not _SAFE_REPO_URL_RE.match(repo_url):
             raise ValueError(f"Refusing to clone: unsafe repo_url {repo_url!r}")
 
+    async def _load_project_env_vars(self, project_id: str) -> list[str]:
+        env_vars = ["NODE_ENV=production"]
+        hex_key = settings.ENV_VAR_ENCRYPTION_KEY
+        if not hex_key:
+            return env_vars
+        try:
+            from sqlalchemy import text
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            import base64
+
+            key = bytes.fromhex(hex_key)
+            if len(key) != 32:
+                logger.warning("ENV_VAR_ENCRYPTION_KEY is not 32 bytes; skipping project env vars")
+                return env_vars
+            aesgcm = AESGCM(key)
+
+            async with AsyncSessionLocal() as db:
+                rows = (
+                    await db.execute(
+                        text(
+                            "SELECT key, encrypted_value FROM environment_variables WHERE project_id = :pid"
+                        ),
+                        {"pid": project_id},
+                    )
+                ).all()
+
+            for row in rows:
+                try:
+                    data = base64.b64decode(row.encrypted_value.encode("utf-8"))
+                    value = aesgcm.decrypt(data[:12], data[12:], None).decode("utf-8")
+                    env_vars.append(f"{row.key}={value}")
+                except Exception as exc:
+                    logger.warning(f"Skipping env var {row.key}: {exc}")
+        except Exception as exc:
+            logger.warning(f"Could not load project env vars: {exc}")
+        return env_vars
+
     async def process_build(self, payload: dict):
         deployment_id = payload.get("deployment_id")
         project_id = payload.get("project_id")
         repo_url = payload.get("repo_url")
-        branch = payload.get("git_branch")
+        branch = payload.get("git_branch") or "main"
         
         if not all([deployment_id, project_id, repo_url]):
             logger.error(f"Invalid payload missing required fields: {payload}")
@@ -72,10 +109,7 @@ class BuilderService:
                 if process.returncode != 0:
                     raise Exception(f"Git clone failed: {stderr.decode()}")
                 
-                # 4. Fetch Env Vars
-                # In a real app, query Project Service or DB for encrypted env vars, decrypt them here.
-                # env_vars = [f"{k}={v}" for k, v in decrypted_vars.items()]
-                env_vars = ["NODE_ENV=production"]
+                env_vars = await self._load_project_env_vars(project_id)
                 
                 # 5. Run Docker Build & Stream Logs
                 container = await docker_runner.run_build_container(work_dir, env_vars)
@@ -99,8 +133,8 @@ class BuilderService:
                 )
                 await kafka_client.send_event("build.completed", event.model_dump(mode="json"), key=project_id)
                 
-                # Cleanup workspace
-                shutil.rmtree(work_dir, ignore_errors=True)
+                # Workspace is left on the shared volume for upload-service;
+                # that service deletes it after a successful upload.
                 
         except Exception as e:
             logger.error(f"Build failed for {deployment_id}: {e}")

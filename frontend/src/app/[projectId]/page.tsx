@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import NotFound from "@/app/not-found";
 import { DeployHubLogo, SketchRocket, SketchLockIcon, SketchSparkle, SketchTerminalIcon } from "@/components/SketchIcons";
-import { getProject, getDeployments, rollbackDeployment, triggerDeployment, Project, Deployment } from "@/lib/api";
+import { getProject, getDeployments, rollbackDeployment, triggerDeployment, bootstrapSession, Project, Deployment } from "@/lib/api";
 
 export default function ProjectOverviewPage() {
   const params = useParams();
@@ -22,6 +22,7 @@ export default function ProjectOverviewPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
+      await bootstrapSession();
       const projData = await getProject(projectId);
       if (!projData) {
         setIsNotFound(true);
@@ -53,7 +54,12 @@ export default function ProjectOverviewPage() {
   const handleRollback = async (dep: Deployment) => {
     setRollbackSuccessMsg(`Rolling back live traffic to ${dep.git_commit} via Caddy Admin API...`);
     const res = await rollbackDeployment(dep.id);
-    
+    if (!res.success) {
+      setRollbackSuccessMsg(`Rollback failed: ${res.message}`);
+      setTimeout(() => setRollbackSuccessMsg(null), 5000);
+      return;
+    }
+
     setDeployments((prev) =>
       prev.map((d) => {
         if (d.id === dep.id) return { ...d, status: "live" };
@@ -61,38 +67,31 @@ export default function ProjectOverviewPage() {
         return d;
       })
     );
-    setRollbackSuccessMsg(`✓ Atomic Rollback complete (<290ms)! ${res.message}. Subdomain traffic now live.`);
+    setRollbackSuccessMsg(`✓ Atomic Rollback complete. ${res.message}`);
     setTimeout(() => setRollbackSuccessMsg(null), 5000);
   };
 
   const handleTriggerDeploy = async () => {
     setIsDeployingNow(true);
-    const triggered = await triggerDeployment(projectId, "main");
-    
-    const newDep: Deployment = {
-      id: triggered.id,
-      project_id: projectId,
-      git_commit: Math.random().toString(36).substring(2, 9),
-      git_branch: "main",
-      status: "building",
-      deployment_number: deployments.length + 1,
-      created_at: new Date().toISOString(),
-    };
+    try {
+      const triggered = await triggerDeployment(projectId, "main");
 
-    setDeployments([newDep, ...deployments]);
+      const newDep: Deployment = {
+        id: triggered.id,
+        project_id: projectId,
+        git_commit: "HEAD",
+        git_branch: "main",
+        status: "queued",
+        deployment_number: deployments.length + 1,
+        created_at: new Date().toISOString(),
+      };
 
-    setTimeout(() => {
-      setDeployments((prev) =>
-        prev.map((d) =>
-          d.id === newDep.id
-            ? { ...d, status: "live", deployed_at: new Date().toISOString() }
-            : d.status === "live"
-            ? { ...d, status: "uploaded" as any }
-            : d
-        )
-      );
+      setDeployments([newDep, ...deployments]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not trigger deploy");
+    } finally {
       setIsDeployingNow(false);
-    }, 2800);
+    }
   };
 
 

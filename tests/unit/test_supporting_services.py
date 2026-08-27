@@ -68,7 +68,7 @@ async def test_caddy_manager_posts_route():
 
 
 @pytest.mark.asyncio
-async def test_upload_handler_simulates_missing_dir():
+async def test_upload_handler_skips_when_build_dir_missing():
     with service_on_path("upload-service"):
         from app.main import process_build_completed
 
@@ -77,7 +77,7 @@ async def test_upload_handler_simulates_missing_dir():
             patch("app.main.AsyncSessionLocal") as db,
             patch("app.main.s3_uploader") as s3,
             patch("app.main.kafka_client") as kafka,
-            patch("os.path.exists", return_value=False),
+            patch("os.path.isdir", return_value=False),
         ):
             session = AsyncMock()
             result = MagicMock()
@@ -91,5 +91,4 @@ async def test_upload_handler_simulates_missing_dir():
             s3.upload_directory = AsyncMock()
             await process_build_completed(payload)
             s3.upload_directory.assert_not_called()
-            kafka.send_event.assert_awaited()
-            assert dep.s3_path.startswith("deployments/")
+            kafka.send_event.assert_not_called()

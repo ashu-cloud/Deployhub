@@ -18,9 +18,20 @@ class Deployment(Base):
     deployed_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     version = Column(Integer, nullable=False, default=0)
-    
+
 class Project(Base):
+    """Read-only mapping of the projects table owned by project-service.
+
+    Columns must match project-service so ``create_all`` on a shared Postgres
+    does not invent a conflicting schema (the previous ``name`` column caused
+    startup IntegrityErrors and broken subdomain routing).
+    """
     __tablename__ = "projects"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True)
-    name = Column(String(100), nullable=False, unique=True)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
+    repo_name = Column(String(255), nullable=False)
+    repo_url = Column(String(500), nullable=False)
+    github_webhook_id = Column(String(100))
+    status = Column(String(50), default="active")
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)

@@ -14,7 +14,8 @@ class GitHubService:
         data = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
-            "code": code
+            "code": code,
+            "redirect_uri": settings.GITHUB_REDIRECT_URI,
         }
         response = await self.http_client.post(url, data=data, headers=headers)
         

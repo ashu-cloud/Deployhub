@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     BUILD_MEM_LIMIT: str = "512m"
     BUILD_CPU_QUOTA: int = 100000
 
+    # Docker named volume that both this service and upload-service mount at
+    # /tmp/builds. The sibling build container must bind the *volume name*
+    # (Docker daemon sees host paths, not this container's filesystem).
+    BUILD_VOLUME_NAME: str = ""
+    ENV_VAR_ENCRYPTION_KEY: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 settings = Settings()

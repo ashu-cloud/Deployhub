@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     CORS_ORIGINS: str = "http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:3000"
+    # Must match the callback URL registered on the GitHub OAuth app.
+    GITHUB_REDIRECT_URI: str = "http://localhost:3000/api/v1/auth/callback"
     EXPOSE_API_DOCS: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

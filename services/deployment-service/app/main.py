@@ -1,5 +1,6 @@
 import logging
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
 from datetime import datetime
@@ -27,7 +28,7 @@ async def process_deployment_uploaded(payload: dict):
             # Get project to figure out subdomain
             proj_res = await db.execute(select(Project).where(Project.id == project_id))
             project = proj_res.scalars().first()
-            subdomain = project.name if project else f"project-{project_id}"
+            subdomain = project.repo_name if project else f"project-{project_id}"
 
             # 1. Update Caddy Route
             await caddy_manager.add_route(subdomain, s3_path)
@@ -71,6 +72,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="DeployHub Deployment Service", lifespan=lifespan)
 app.include_router(deployments_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.middleware("http")
 async def security_headers(request, call_next):

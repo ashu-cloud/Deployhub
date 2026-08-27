@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import NotFound from "@/app/not-found";
 import { DeployHubLogo, SketchRocket, SketchTerminalIcon, SketchLockIcon, SketchSparkle } from "@/components/SketchIcons";
-import { getProject } from "@/lib/api";
+import { getProject, getAuthToken, bootstrapSession } from "@/lib/api";
 
 interface LogEntry {
   time: string;
@@ -55,6 +55,7 @@ export default function DeploymentDetailPage() {
   // Validate project existence
   useEffect(() => {
     async function validate() {
+      await bootstrapSession();
       const proj = await getProject(projectId);
       if (!proj) {
         setIsNotFound(true);
@@ -72,49 +73,7 @@ export default function DeploymentDetailPage() {
 
     let ws: WebSocket | null = null;
     let fallbackInterval: NodeJS.Timeout | null = null;
-
-    try {
-      const wsUrl = `ws://${window.location.hostname}:8006/deployments/ws/${deploymentId}`;
-      ws = new WebSocket(wsUrl);
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          if (data.type === 'ai_start') {
-            setAiStatus('thinking');
-            return;
-          }
-          if (data.type === 'ai_token') {
-            setAiDiagnosis(prev => prev + data.text);
-            return;
-          }
-          if (data.type === 'ai_done') {
-            setAiStatus('done');
-            return;
-          }
-
-          const now = new Date();
-          const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
-          if (data.line) {
-            setLogs((prev) => [...prev, { time: timeStr, text: data.line, type: data.line.includes("[WARN]") ? "warn" : data.line.includes("[ERROR]") ? "error" : "info" }]);
-          } else if (data.status === "live") {
-            setIsLive(true);
-            setCurrentStage("caddy");
-          }
-        } catch (e) {
-          // ignore
-        }
-      };
-
-      ws.onerror = () => {
-        // Start simulated playback if backend WebSocket is offline
-        startFallbackPlayback();
-      };
-    } catch (e) {
-      startFallbackPlayback();
-    }
+    let cancelled = false;
 
     function startFallbackPlayback() {
       if (fallbackInterval) return;
@@ -129,17 +88,85 @@ export default function DeploymentDetailPage() {
 
           if (index === 1) setCurrentStage("minio");
           if (index === 3) setCurrentStage("caddy");
-          if (index === 4) {
-            setIsLive(true);
-            if (fallbackInterval) clearInterval(fallbackInterval);
-          }
-
-          index++;
+          if (index === STREAMING_LOGS.length - 1) setIsLive(true);
+          index += 1;
+        } else if (fallbackInterval) {
+          clearInterval(fallbackInterval);
         }
-      }, 1800);
+      }, 900);
     }
 
+    (async () => {
+      await bootstrapSession();
+      if (cancelled) return;
+      const token = getAuthToken();
+      if (!token) {
+        startFallbackPlayback();
+        return;
+      }
+
+      try {
+        const wsUrl = `ws://${window.location.hostname}:8006/deployments/ws/${deploymentId}?token=${encodeURIComponent(token)}`;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          setLogs([]);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+
+            if (data.type === "ai_start") {
+              setAiStatus("thinking");
+              return;
+            }
+            if (data.type === "ai_token") {
+              setAiDiagnosis((prev) => prev + data.text);
+              return;
+            }
+            if (data.type === "ai_done") {
+              setAiStatus("done");
+              return;
+            }
+
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+            if (data.line) {
+              setLogs((prev) => [
+                ...prev,
+                {
+                  time: timeStr,
+                  text: data.line,
+                  type: data.line.includes("[WARN]")
+                    ? "warn"
+                    : data.line.includes("[ERROR]")
+                      ? "error"
+                      : "info",
+                },
+              ]);
+            } else if (data.message) {
+              setLogs((prev) => [...prev, { time: timeStr, text: data.message, type: "info" }]);
+            } else if (data.status === "live") {
+              setIsLive(true);
+              setCurrentStage("caddy");
+            }
+          } catch (e) {
+            // ignore
+          }
+        };
+
+        ws.onerror = () => {
+          startFallbackPlayback();
+        };
+      } catch (e) {
+        startFallbackPlayback();
+      }
+    })();
+
     return () => {
+      cancelled = true;
       if (ws) ws.close();
       if (fallbackInterval) clearInterval(fallbackInterval);
     };

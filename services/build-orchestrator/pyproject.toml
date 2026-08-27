@@ -12,7 +12,8 @@ dependencies = [
     "aiokafka",
     "redis",
     "aiodocker",
-    "groq"
+    "groq",
+    "cryptography",
 ]
 
 [build-system]

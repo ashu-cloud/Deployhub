@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -19,6 +21,8 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     # Refresh token only -- the access token itself is handed back in the
     # JSON body for the SPA to hold in memory (architecture: RS256 access
     # token stored in memory, RS256 refresh token as HttpOnly+Secure+Strict).
+    # Path is "/" so the cookie is sent both to the Next.js rewrite
+    # (/api/v1/auth/refresh) and to a direct hit on this service (/auth/refresh).
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=refresh_token,
@@ -26,20 +30,27 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
         secure=True,
         samesite="strict",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
-        path="/auth",
+        path="/",
     )
+
+
+def _wants_html(request: Request) -> bool:
+    accept = request.headers.get("accept", "")
+    return "text/html" in accept
+
 
 @router.get("/github")
 async def login_github():
     github_auth_url = (
         f"https://github.com/login/oauth/authorize"
-        f"?client_id={settings.GITHUB_CLIENT_ID}"
+        f"?client_id={quote(settings.GITHUB_CLIENT_ID)}"
+        f"&redirect_uri={quote(settings.GITHUB_REDIRECT_URI, safe='')}"
         f"&scope=user:email"
     )
     return RedirectResponse(url=github_auth_url)
 
 @router.get("/callback")
-async def github_callback(code: str, response: Response, db: AsyncSession = Depends(get_db)):
+async def github_callback(code: str, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     # 1. Get Access Token
     gh_token = await github_service.get_access_token(code)
     
@@ -68,12 +79,20 @@ async def github_callback(code: str, response: Response, db: AsyncSession = Depe
     # returned to the client to hold in memory for Authorization headers.
     _set_refresh_cookie(response, refresh_token)
 
-    return {
+    payload = {
         "message": "Successfully authenticated",
         "access_token": access_token,
         "token_type": "bearer",
         "user_id": str(user.id)
     }
+    # Browser OAuth is a top-level navigation (Accept: text/html). Send the
+    # user back to the SPA, which bootstraps the access token via /auth/refresh.
+    # API/test clients still get the JSON body.
+    if _wants_html(request):
+        redirect = RedirectResponse(url=f"{settings.FRONTEND_URL.rstrip('/')}/auth/callback")
+        _set_refresh_cookie(redirect, refresh_token)
+        return redirect
+    return payload
 
 @router.post("/refresh")
 async def refresh_access_token(request: Request, response: Response):
@@ -97,7 +116,7 @@ async def refresh_access_token(request: Request, response: Response):
 
 @router.post("/logout")
 async def logout(response: Response):
-    response.delete_cookie(REFRESH_COOKIE_NAME, path="/auth")
+    response.delete_cookie(REFRESH_COOKIE_NAME, path="/")
     return {"message": "Logged out"}
 
 @router.get("/me")

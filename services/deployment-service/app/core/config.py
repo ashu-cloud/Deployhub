@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     # reachable only over a filesystem-shared Unix socket between the caddy
     # and deployment-service containers.
     CADDY_ADMIN_URL: str = "unix:///srv/caddy-admin/admin.sock"
-    BASE_DOMAIN: str = "deployhub.dev"
+    BASE_DOMAIN: str = "localhost"
+    MINIO_DIAL: str = "minio:9000"
+    S3_BUCKET_NAME: str = "deployhub-artifacts"
+    CORS_ORIGINS: str = "http://localhost:3000"
 
     # RS256: only the public key is needed to verify tokens minted by auth-service.
     JWT_ALGORITHM: str = "RS256"

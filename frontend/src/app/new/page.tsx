@@ -71,17 +71,20 @@ export default function CreateProjectPage() {
     envVars.forEach((ev) => {
       envMap[ev.key] = ev.value;
     });
-
     const repoUrl = `https://github.com/deployhub/${selectedRepo.name}`;
-    const project = await createProject({
-      repo_name: selectedRepo.name,
-      repo_url: repoUrl,
-      framework,
-      env_vars: envMap,
-    });
-
-    setIsDeploying(false);
-    router.push(`/${project.id}`);
+    try {
+      const project = await createProject({
+        repo_name: selectedRepo.name,
+        repo_url: repoUrl,
+        framework,
+        env_vars: envMap,
+      });
+      router.push(`/${project.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not create project");
+    } finally {
+      setIsDeploying(false);
+    }
   };
 
 

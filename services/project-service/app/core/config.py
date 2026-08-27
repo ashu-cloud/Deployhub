@@ -8,6 +8,10 @@ class Settings(BaseSettings):
 
     GITHUB_API_TOKEN: str = "" # Personal Access Token or GitHub App token for API calls
 
+    # Public URL GitHub should POST webhooks to. Localhost is unreachable from
+    # GitHub -- set this to an ngrok/cloudflare-tunnel URL when testing real pushes.
+    WEBHOOK_BASE_URL: str = "http://localhost:3000/api/v1"
+
     # No hardcoded default: a shared webhook/HMAC secret must come from the
     # environment (see scripts/generate_secrets.py). An empty value fails
     # closed -- verify_github_signature() will reject every signature.

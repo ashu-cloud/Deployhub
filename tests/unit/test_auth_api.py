@@ -36,6 +36,7 @@ async def test_github_login_redirects_to_github():
         location = response.headers["location"]
         assert location.startswith("https://github.com/login/oauth/authorize")
         assert "client_id=" in location
+        assert "redirect_uri=" in location
         assert "scope=user:email" in location
 
 

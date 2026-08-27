@@ -9,8 +9,9 @@ import logging
 from app.core.db import get_db, AsyncSessionLocal
 from app.core.redis import redis_client
 from app.core.security import get_current_user, get_current_user_from_token
-from app.models import Deployment
-from app.services.caddy_manager import caddy_manager
+from app.models import Deployment, Project
+from app.services.caddy_manager import caddy_manager, slugify_subdomain
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +41,14 @@ async def rollback_deployment(deployment_id: UUID, user_id: str = Depends(get_cu
     if not deployment or deployment.status != 'live':
         raise HTTPException(status_code=400, detail="Deployment not found or not live")
 
-    # 2. Re-route Caddy
-    subdomain = f"project-{deployment.project_id}" 
+    # 2. Re-route Caddy using the same subdomain scheme as a live deploy
+    proj_res = await db.execute(select(Project).where(Project.id == deployment.project_id))
+    project = proj_res.scalars().first()
+    subdomain = project.repo_name if project else f"project-{deployment.project_id}"
     await caddy_manager.add_route(subdomain, deployment.s3_path)
-    
-    return {"message": "Rollback successful", "live_url": f"http://{subdomain}.deployhub.dev"}
+
+    live_url = f"http://{slugify_subdomain(subdomain)}.{settings.BASE_DOMAIN}"
+    return {"message": "Rollback successful", "live_url": live_url}
 
 @router.websocket("/ws/{deployment_id}")
 async def websocket_deployment_logs(websocket: WebSocket, deployment_id: str, token: str | None = Query(default=None)):

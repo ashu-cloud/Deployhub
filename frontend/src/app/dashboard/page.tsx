@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DeployHubLogo, SketchRocket, SketchTerminalIcon, SketchLockIcon, SketchSparkle } from "@/components/SketchIcons";
-import { listProjects, createProject, Project } from "@/lib/api";
+import { listProjects, createProject, Project, bootstrapSession } from "@/lib/api";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -20,6 +20,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
+      await bootstrapSession();
       const data = await listProjects();
       setProjects(data);
       setLoading(false);
@@ -41,18 +42,23 @@ export default function DashboardPage() {
     if (!newProjectName.trim()) return;
 
     setIsSubmitting(true);
-    const repoUrl = newRepoUrl.trim() || `https://github.com/ashupanchal/${newProjectName.trim().toLowerCase()}`;
-    const created = await createProject({
-      repo_name: newProjectName.trim(),
-      repo_url: repoUrl,
-    });
+    try {
+      const repoUrl = newRepoUrl.trim() || `https://github.com/ashupanchal/${newProjectName.trim().toLowerCase()}`;
+      const created = await createProject({
+        repo_name: newProjectName.trim(),
+        repo_url: repoUrl,
+      });
 
-    setProjects((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
-    setNewProjectName("");
-    setNewRepoUrl("");
-    setIsSubmitting(false);
-    setShowNewProjectModal(false);
-    router.push(`/${created.id}`);
+      setProjects((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
+      setNewProjectName("");
+      setNewRepoUrl("");
+      setShowNewProjectModal(false);
+      router.push(`/${created.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not create project");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 
