@@ -5,7 +5,95 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import NotFound from "@/app/not-found";
 import { DeployHubLogo, SketchRocket, SketchLockIcon, SketchSparkle, SketchTerminalIcon } from "@/components/SketchIcons";
-import { getProject, getDeployments, rollbackDeployment, triggerDeployment, bootstrapSession, Project, Deployment } from "@/lib/api";
+import { getProject, getDeployments, rollbackDeployment, triggerDeployment, bootstrapSession, Project, Deployment, CustomDomain, listCustomDomains, addCustomDomain, deleteCustomDomain } from "@/lib/api";
+
+function DomainsTab({ projectId }: { projectId: string }) {
+  const [domains, setDomains] = useState<CustomDomain[]>([]);
+  const [newDomain, setNewDomain] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDomains();
+  }, [projectId]);
+
+  const loadDomains = async () => {
+    setLoading(true);
+    const data = await listCustomDomains(projectId);
+    setDomains(data);
+    setLoading(false);
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDomain.trim()) return;
+    try {
+      await addCustomDomain(projectId, newDomain.trim());
+      setNewDomain("");
+      await loadDomains();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to add domain");
+    }
+  };
+
+  const handleDelete = async (domainId: string) => {
+    if (!confirm("Are you sure you want to remove this domain?")) return;
+    await deleteCustomDomain(projectId, domainId);
+    await loadDomains();
+  };
+
+  return (
+    <section className="bg-surface-container p-6 doodle-border paper-shadow font-mono text-xs space-y-6 animate-fade-up">
+      <h3 className="text-lg font-bold text-sketch-white font-serif">Custom Domains</h3>
+      <p className="text-on-surface-variant">
+        Attach custom domains to your project. Caddy will automatically provision SSL certificates and route traffic to your live deployment.
+      </p>
+
+      <form onSubmit={handleAdd} className="flex gap-3 max-w-md">
+        <input
+          type="text"
+          placeholder="e.g. app.mycompany.com"
+          value={newDomain}
+          onChange={(e) => setNewDomain(e.target.value)}
+          className="flex-grow bg-surface doodle-border p-2.5 text-sketch-white focus:outline-none focus:border-primary"
+        />
+        <button
+          type="submit"
+          className="px-4 py-2.5 bg-primary text-surface font-bold doodle-border-emerald paper-shadow-emerald hover:bg-primary-fixed transition-all cursor-pointer"
+        >
+          Add Domain
+        </button>
+      </form>
+
+      {loading ? (
+        <div className="text-outline">Loading domains...</div>
+      ) : domains.length === 0 ? (
+        <div className="text-outline italic">No custom domains attached yet.</div>
+      ) : (
+        <div className="space-y-3 pt-4">
+          {domains.map(d => (
+            <div key={d.id} className="flex items-center justify-between p-3 bg-surface doodle-border">
+              <div className="flex items-center gap-3">
+                <span className="text-sketch-white font-bold">{d.domain}</span>
+                {d.verified ? (
+                  <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded border border-primary">Verified</span>
+                ) : (
+                  <span className="text-[10px] bg-outline/20 text-outline px-2 py-0.5 rounded border border-outline">Pending</span>
+                )}
+              </div>
+              <button
+                onClick={() => handleDelete(d.id)}
+                className="text-error hover:text-error-container transition-colors"
+                title="Remove Domain"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function ProjectOverviewPage() {
   const params = useParams();
@@ -261,6 +349,7 @@ export default function ProjectOverviewPage() {
           <div className="flex gap-6 border-b-2 border-outline-variant border-dashed pb-2 font-mono text-sm">
             {[
               { id: "deployments", label: "Deployments" },
+              { id: "domains", label: "Custom Domains" },
               { id: "overview", label: "Overview & Metrics" },
               { id: "infrastructure", label: "Infrastructure" },
               { id: "settings", label: "Environment & Settings" },
@@ -292,6 +381,13 @@ export default function ProjectOverviewPage() {
               ✕
             </button>
           </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 0: DOMAINS */}
+        {/* ========================================================================= */}
+        {activeTab === "domains" && (
+          <DomainsTab projectId={projectId} />
         )}
 
         {/* ========================================================================= */}

@@ -40,8 +40,17 @@ async def process_deployment_uploaded(payload: dict):
                 deployment.status = 'live'
                 deployment.deployed_at = datetime.utcnow()
                 await db.commit()
+
+            # 3. Add Custom Domain Routes
+            from app.models import CustomDomain
+            domain_res = await db.execute(select(CustomDomain).where(CustomDomain.project_id == project_id, CustomDomain.verified == True))
+            for custom_domain in domain_res.scalars().all():
+                try:
+                    await caddy_manager.add_custom_domain_route(custom_domain.domain, s3_path)
+                except Exception as e:
+                    logger.error(f"Failed to add custom domain route for {custom_domain.domain}: {e}")
                 
-        # 3. Publish deployment.live event
+        # 4. Publish deployment.live event
         live_url = f"http://{subdomain}.{settings.BASE_DOMAIN}"
         event = DeploymentLiveEvent(
             deployment_id=deployment_id,

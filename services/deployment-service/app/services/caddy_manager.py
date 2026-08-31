@@ -79,4 +79,49 @@ class CaddyManager:
             logger.error(f"Failed to communicate with Caddy: {e}")
             raise
 
+    async def add_custom_domain_route(self, domain: str, s3_path: str):
+        """
+        Dynamically prepends a host route for a custom domain to reverse-proxy
+        to the MinIO prefix that holds this deployment.
+        """
+        prefix = f"/{settings.S3_BUCKET_NAME}/{s3_path.strip('/')}"
+
+        route_config = {
+            "match": [{"host": [domain]}],
+            "handle": [
+                {
+                    "handler": "rewrite",
+                    "match": [{"path": ["/"]}],
+                    "uri": "/index.html",
+                },
+                {
+                    "handler": "rewrite",
+                    "uri": prefix + "{http.request.uri}",
+                },
+                {
+                    "handler": "reverse_proxy",
+                    "upstreams": [{"dial": self.minio_dial}],
+                },
+            ],
+        }
+
+        try:
+            resp = await self.client.post(
+                "/config/apps/http/servers/srv0/routes/0",
+                json=route_config,
+            )
+            if resp.status_code == 404:
+                resp = await self.client.post(
+                    "/config/apps/http/servers/srv0/routes",
+                    json=route_config,
+                )
+            resp.raise_for_status()
+            logger.info(f"Successfully added Caddy custom domain route for {domain} -> {prefix}")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Caddy API error for custom domain: {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to communicate with Caddy for custom domain: {e}")
+            raise
+
 caddy_manager = CaddyManager()

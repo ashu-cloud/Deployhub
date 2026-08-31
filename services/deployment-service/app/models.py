@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime
+from sqlalchemy import Column, String, Integer, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.db import Base
@@ -34,4 +34,13 @@ class Project(Base):
     repo_url = Column(String(500), nullable=False)
     github_webhook_id = Column(String(100))
     status = Column(String(50), default="active")
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+class CustomDomain(Base):
+    __tablename__ = "custom_domains"
+    id = Column(UUID(as_uuid=True), primary_key=True)
+    project_id = Column(UUID(as_uuid=True), nullable=False)
+    domain = Column(String(255), unique=True, nullable=False)
+    verified = Column(Boolean, default=False)
+    ssl_cert_id = Column(String(100))
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)

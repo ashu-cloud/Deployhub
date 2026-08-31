@@ -142,3 +142,78 @@ async def trigger_deployment(
         "created_at": new_dep.created_at.isoformat() if new_dep.created_at else None
     }
 
+
+# ==========================================
+# CUSTOM DOMAINS API
+# ==========================================
+
+from app.schemas.project import CustomDomainCreate, CustomDomainResponse
+from app.models import CustomDomain
+
+@router.post("/{project_id}/domains", response_model=CustomDomainResponse, status_code=status.HTTP_201_CREATED)
+async def add_custom_domain(
+    project_id: UUID,
+    domain_in: CustomDomainCreate,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Verify project exists and belongs to user
+    result = await db.execute(select(Project).where(Project.id == project_id, Project.user_id == user_id))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check if domain is already in use by any project
+    domain_check = await db.execute(select(CustomDomain).where(CustomDomain.domain == domain_in.domain))
+    if domain_check.scalars().first():
+        raise HTTPException(status_code=400, detail="Domain is already attached to a project")
+
+    # Add domain
+    new_domain = CustomDomain(
+        project_id=project_id,
+        domain=domain_in.domain,
+        verified=True  # For MVP, assume verified. In real app, we'd verify DNS.
+    )
+    db.add(new_domain)
+    await db.commit()
+    await db.refresh(new_domain)
+
+    # In a full production system, we'd fire an event to deployment-service here
+    # to add this domain to Caddy for the currently live deployment.
+    # We will handle it on next deployment for simplicity of this MVP, or we can trigger a re-sync.
+    
+    return new_domain
+
+@router.get("/{project_id}/domains", response_model=List[CustomDomainResponse])
+async def list_custom_domains(
+    project_id: UUID,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(Project).where(Project.id == project_id, Project.user_id == user_id))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    domains = await db.execute(select(CustomDomain).where(CustomDomain.project_id == project_id))
+    return domains.scalars().all()
+
+@router.delete("/{project_id}/domains/{domain_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_custom_domain(
+    project_id: UUID,
+    domain_id: UUID,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Verify project exists and belongs to user
+    result = await db.execute(select(Project).where(Project.id == project_id, Project.user_id == user_id))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    domain = await db.execute(select(CustomDomain).where(CustomDomain.id == domain_id, CustomDomain.project_id == project_id))
+    db_domain = domain.scalars().first()
+    if not db_domain:
+        raise HTTPException(status_code=404, detail="Domain not found")
+
+    await db.delete(db_domain)
+    await db.commit()
+

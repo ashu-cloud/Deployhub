@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { DeployHubLogo, SketchLockIcon, SketchSparkle } from "@/components/SketchIcons";
+import { RedirectIfLoggedIn } from "@/components/RedirectIfLoggedIn";
 
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background text-on-surface paper-texture flex flex-col justify-between relative overflow-hidden">
+      <RedirectIfLoggedIn />
       {/* Decorative Background Doodles (Absolute Positioned) */}
       <div className="absolute top-20 left-20 opacity-20 text-outline-variant transform -rotate-12 pointer-events-none hidden md:block select-none">
         <div className="text-8xl font-mono">☁</div>

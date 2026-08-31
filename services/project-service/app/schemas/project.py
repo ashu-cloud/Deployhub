@@ -30,3 +30,16 @@ class EnvVarResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class CustomDomainCreate(BaseModel):
+    domain: str = Field(..., min_length=3, max_length=255)
+
+class CustomDomainResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    domain: str
+    verified: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

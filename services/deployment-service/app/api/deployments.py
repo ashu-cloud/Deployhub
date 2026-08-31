@@ -65,9 +65,10 @@ async def websocket_deployment_logs(websocket: WebSocket, deployment_id: str, to
     pubsub = redis_client.pubsub()
     channel = f"build:{deployment_id}:logs"
     status_channel = f"deployment:{deployment_id}:status"
+    ai_diagnosis_channel = f"build:{deployment_id}:ai_diagnosis"
     
-    await pubsub.subscribe(channel, status_channel)
-    logger.info(f"WebSocket client connected to {channel}")
+    await pubsub.subscribe(channel, status_channel, ai_diagnosis_channel)
+    logger.info(f"WebSocket client connected to channels for {deployment_id}")
 
     try:
         # Initial greeting and handshake
@@ -93,4 +94,4 @@ async def websocket_deployment_logs(websocket: WebSocket, deployment_id: str, to
     except Exception as e:
         logger.error(f"WebSocket error for {deployment_id}: {e}")
     finally:
-        await pubsub.unsubscribe(channel, status_channel)
+        await pubsub.unsubscribe(channel, status_channel, ai_diagnosis_channel)
