@@ -10,11 +10,20 @@ class KafkaProducerClient:
         self.producer = None
 
     async def start(self):
+        sasl_kwargs = {}
+        if settings.KAFKA_SASL_USERNAME:
+            sasl_kwargs = {
+                "security_protocol": settings.KAFKA_SECURITY_PROTOCOL or "SASL_SSL",
+                "sasl_mechanism": settings.KAFKA_SASL_MECHANISM or "PLAIN",
+                "sasl_plain_username": settings.KAFKA_SASL_USERNAME,
+                "sasl_plain_password": settings.KAFKA_SASL_PASSWORD,
+            }
         self.producer = AIOKafkaProducer(
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
             acks="all",
-            enable_idempotence=True
+            enable_idempotence=True,
+            **sasl_kwargs
         )
         await self.producer.start()
         logger.info("Kafka producer started")

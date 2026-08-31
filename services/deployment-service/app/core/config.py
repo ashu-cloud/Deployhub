@@ -5,6 +5,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://deployhub:password@localhost:5432/deployhub"
     REDIS_URL: str = "redis://localhost:6379/0"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
+    # SASL/SSL settings — leave empty to use plain TCP (local dev)
+    KAFKA_SECURITY_PROTOCOL: str = ""    # e.g. SASL_SSL
+    KAFKA_SASL_MECHANISM: str = ""       # e.g. PLAIN
+    KAFKA_SASL_USERNAME: str = ""
+    KAFKA_SASL_PASSWORD: str = ""
 
     # Caddy's admin API is not published on any network interface. It is
     # reachable only over a filesystem-shared Unix socket between the caddy

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DeployHubLogo, SketchRocket, SketchTerminalIcon, SketchLockIcon, SketchSparkle } from "@/components/SketchIcons";
-import { listProjects, createProject, Project, bootstrapSession } from "@/lib/api";
+import { listProjects, createProject, Project, bootstrapSession, logout } from "@/lib/api";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -164,11 +164,20 @@ export default function DashboardPage() {
         <div className="mt-auto border-t-2 border-outline-variant border-dashed pt-4 font-mono text-xs text-outline space-y-2">
           <Link
             href="/"
-            className="flex items-center gap-2 hover:text-primary transition-colors"
+            className="flex items-center gap-2 hover:text-primary transition-colors mb-2"
           >
             <span>←</span>
             <span>Back to Landing Page</span>
           </Link>
+          <button
+            onClick={async () => {
+              await logout();
+              router.push("/");
+            }}
+            className="doodle-btn bg-background text-tertiary font-bold text-sm px-4 py-2 hover:bg-surface-variant transition-colors paper-shadow w-full text-center cursor-pointer mt-2"
+          >
+            Log Out
+          </button>
           <div className="text-[10px] text-outline/80 pt-1">
             Cluster: <strong className="text-primary">Kafka KRaft Live</strong>
           </div>
