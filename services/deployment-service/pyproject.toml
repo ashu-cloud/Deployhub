@@ -13,7 +13,8 @@ dependencies = [
     "redis",
     "httpx",
     "pyjwt",
-    "cryptography"
+    "cryptography",
+    "websockets"
 ]
 
 [build-system]

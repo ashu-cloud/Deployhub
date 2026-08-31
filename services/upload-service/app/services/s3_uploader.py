@@ -15,7 +15,8 @@ class S3Uploader:
             's3', 
             endpoint_url=settings.S3_ENDPOINT_URL,
             aws_access_key_id=settings.S3_ACCESS_KEY,
-            aws_secret_access_key=settings.S3_SECRET_KEY
+            aws_secret_access_key=settings.S3_SECRET_KEY,
+            region_name='us-east-1'
         ) as client:
             try:
                 await client.head_bucket(Bucket=settings.S3_BUCKET_NAME)
@@ -48,7 +49,8 @@ class S3Uploader:
             's3', 
             endpoint_url=settings.S3_ENDPOINT_URL,
             aws_access_key_id=settings.S3_ACCESS_KEY,
-            aws_secret_access_key=settings.S3_SECRET_KEY
+            aws_secret_access_key=settings.S3_SECRET_KEY,
+            region_name='us-east-1'
         ) as client:
             
             for root, dirs, files in os.walk(local_dir):

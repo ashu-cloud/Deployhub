@@ -114,6 +114,8 @@ async def refresh_access_token(request: Request, response: Response):
     try:
         payload = decode_refresh_token(token)
     except jwt.PyJWTError:
+        # Clear the bad/expired cookie so the browser doesn't keep retrying
+        response.delete_cookie(REFRESH_COOKIE_NAME, path="/")
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
     user_id = payload.get("sub")

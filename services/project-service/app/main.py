@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="DeployHub Project Service",
     lifespan=lifespan,
+    redirect_slashes=False,  # Prevent 307 redirects that strip Authorization headers
     docs_url="/docs" if settings.EXPOSE_API_DOCS else None,
     redoc_url="/redoc" if settings.EXPOSE_API_DOCS else None,
     openapi_url="/openapi.json" if settings.EXPOSE_API_DOCS else None,

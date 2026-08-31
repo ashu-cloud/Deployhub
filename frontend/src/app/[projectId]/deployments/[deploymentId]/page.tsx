@@ -13,27 +13,7 @@ interface LogEntry {
   type: "info" | "warn" | "error" | "success" | "accent";
 }
 
-const INITIAL_LOGS: LogEntry[] = [
-  { time: "17:53:01", text: "[SYSTEM] Establishing secure WebSocket connection to builder node...", type: "info" },
-  { time: "17:53:02", text: "[KAFKA] Acquired event `build.queued` from partition 0 (offset: 9812)", type: "accent" },
-  { time: "17:53:03", text: "[REDIS] Acquired distributed project build lock: lock:build:deployhub-web", type: "info" },
-  { time: "17:53:04", text: "[DOCKER] Spawning isolated runner container with cgroups (2 CPU, 4GB RAM)", type: "warn" },
-  { time: "17:53:06", text: "[GIT] Cloned repository ref `main` (commit: a9f8b4c) in 1.4s", type: "info" },
-  { time: "17:53:08", text: "[BUILD] Resolving dependencies via pnpm (lockfile up to date)...", type: "info" },
-  { time: "17:53:11", text: "[BUILD] Next.js 16 compiler optimization finished in 3.1s", type: "success" },
-  { time: "17:53:12", text: "[UPLOAD] Streaming static chunks & server bundle to MinIO S3 bucket `deployhub-artifacts`", type: "info" },
-  { time: "17:53:14", text: "[UPLOAD] Uploaded 48 assets (14.2 MB) with SHA256 integrity check passed", type: "success" },
-  { time: "17:53:15", text: "[CADDY] Registering dynamic subdomain route deployhub-web.deployhub.dev via Admin API", type: "accent" },
-  { time: "17:53:16", text: "[SYSTEM] Deployment live! Sub-second healthcheck 200 OK in 18ms", type: "success" },
-];
-
-const STREAMING_LOGS = [
-  { text: "[DOCKER] Building container image from Dockerfile (layer caching active)", type: "info" as const },
-  { text: "[UPLOAD] Streaming build artifact bundle to MinIO S3 cluster bucket", type: "info" as const },
-  { text: "[KAFKA] Emitted `deployment.uploaded` to topic `deployments.v1`", type: "accent" as const },
-  { text: "[CADDY] Registering dynamic subdomain route deployhub-web.deployhub.dev via Admin API", type: "accent" as const },
-  { text: "[SYSTEM] Deployment live! Sub-second healthcheck 200 OK in 18ms", type: "success" as const },
-];
+const INITIAL_LOGS: LogEntry[] = [];
 
 export default function DeploymentDetailPage() {
   const params = useParams();
@@ -76,24 +56,14 @@ export default function DeploymentDetailPage() {
     let cancelled = false;
 
     function startFallbackPlayback() {
-      if (fallbackInterval) return;
-      let index = 0;
-      fallbackInterval = setInterval(() => {
-        if (index < STREAMING_LOGS.length) {
-          const item = STREAMING_LOGS[index];
-          const now = new Date();
-          const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
-          setLogs((prev) => [...prev, { time: timeStr, text: item.text, type: item.type }]);
-
-          if (index === 1) setCurrentStage("minio");
-          if (index === 3) setCurrentStage("caddy");
-          if (index === STREAMING_LOGS.length - 1) setIsLive(true);
-          index += 1;
-        } else if (fallbackInterval) {
-          clearInterval(fallbackInterval);
-        }
-      }, 900);
+      // Instead of fake logs, just show an error connecting to the stream
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+      setLogs((prev) => [
+        ...prev,
+        { time: timeStr, text: "[ERROR] Failed to connect to secure WebSocket log stream.", type: "error" },
+        { time: timeStr, text: "[SYSTEM] Ensure deployment-service is running and accessible.", type: "warn" }
+      ]);
     }
 
     (async () => {
@@ -110,7 +80,7 @@ export default function DeploymentDetailPage() {
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-          setLogs([]);
+          setLogs([{ time: new Date().toLocaleTimeString(), text: "[SYSTEM] Secure WebSocket connection established.", type: "info" }]);
         };
 
         ws.onmessage = (event) => {

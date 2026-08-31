@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
         source: "/api/v1/auth/:path*",
         destination: `${AUTH_SERVICE_URL}/auth/:path*`,
       },
+      // Match both /api/v1/projects and /api/v1/projects/ and /api/v1/projects/anything
+      {
+        source: "/api/v1/projects",
+        destination: `${PROJECT_SERVICE_URL}/projects/`,
+      },
       {
         source: "/api/v1/projects/:path*",
         destination: `${PROJECT_SERVICE_URL}/projects/:path*`,

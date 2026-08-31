@@ -140,7 +140,13 @@ export default function CreateProjectPage() {
     setLoadingRepos(true);
     setStepError(null);
     try {
-      await bootstrapSession();
+      const sessionOk = await bootstrapSession();
+      console.log("[fetchRepos] bootstrapSession result:", sessionOk);
+      if (!sessionOk) {
+        setStepError("Session expired. Please log in again.");
+        router.push("/login");
+        return;
+      }
       const data = await getGithubRepos();
       setRepos(data || []);
       if (data && data.length > 0 && !selectedRepo) {
@@ -246,6 +252,24 @@ export default function CreateProjectPage() {
     setIsDeploying(true);
     setDeployError(null);
 
+    // Always refresh the session token right before deploying
+    console.log("[handleDeploy] Refreshing session before deploy...");
+    const sessionOk = await bootstrapSession();
+    console.log("[handleDeploy] Session bootstrap result:", sessionOk);
+    
+    // Log the current in-memory token state (first 20 chars only for security)
+    const { getAuthToken } = await import("@/lib/api");
+    const token = getAuthToken();
+    console.log("[handleDeploy] inMemoryAuthToken exists:", !!token);
+    console.log("[handleDeploy] token preview:", token ? token.substring(0, 20) + "..." : "NULL");
+
+    if (!sessionOk || !token) {
+      setDeployError("Your session expired. Please log in again.");
+      setIsDeploying(false);
+      setTimeout(() => router.push("/login"), 2000);
+      return;
+    }
+
     const envMap: Record<string, string> = {};
     envVars.forEach((ev) => {
       if (ev.key.trim()) {
@@ -257,6 +281,12 @@ export default function CreateProjectPage() {
       ? `https://github.com/${selectedRepo.full_name}`
       : `https://github.com/deployhub/${selectedRepo.name}`;
 
+    console.log("[handleDeploy] Calling createProject with:", {
+      repo_name: selectedRepo.name,
+      repo_url: repoUrl,
+      framework,
+    });
+
     try {
       const project = await createProject({
         repo_name: selectedRepo.name,
@@ -264,8 +294,10 @@ export default function CreateProjectPage() {
         framework,
         env_vars: envMap,
       });
+      console.log("[handleDeploy] Project created successfully:", project);
       router.push(`/${project.id}`);
     } catch (err) {
+      console.error("[handleDeploy] createProject failed:", err);
       setDeployError(err instanceof Error ? err.message : "Could not create project");
       setIsDeploying(false);
     }
@@ -344,7 +376,7 @@ export default function CreateProjectPage() {
           </Link>
           <button
             onClick={handleLogout}
-            className="w-full doodle-btn bg-surface hover:bg-surface-container-high text-tertiary font-mono font-bold text-xs py-2 px-3 flex items-center justify-center gap-2 paper-shadow transition-all text-center border-tertiary/40 hover:border-tertiary cursor-pointer"
+            className="w-full doodle-btn bg-surface hover:bg-surface-container-high text-yellow-400 font-mono font-bold text-xs py-2 px-3 flex items-center justify-center gap-2 paper-shadow transition-all text-center border-yellow-400/40 hover:border-yellow-400 cursor-pointer"
           >
             <span>🚪</span>
             <span>Log Out</span>

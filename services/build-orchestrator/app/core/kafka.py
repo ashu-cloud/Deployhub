@@ -13,12 +13,18 @@ class KafkaClient:
     async def start(self, message_handler=None):
         sasl_kwargs = {}
         if settings.KAFKA_SASL_USERNAME:
+            import ssl
             sasl_kwargs = {
                 "security_protocol": settings.KAFKA_SECURITY_PROTOCOL or "SASL_SSL",
                 "sasl_mechanism": settings.KAFKA_SASL_MECHANISM or "PLAIN",
                 "sasl_plain_username": settings.KAFKA_SASL_USERNAME,
                 "sasl_plain_password": settings.KAFKA_SASL_PASSWORD,
             }
+            if sasl_kwargs["security_protocol"] == "SASL_SSL":
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                sasl_kwargs["ssl_context"] = ctx
         # Start Producer
         self.producer = AIOKafkaProducer(
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,

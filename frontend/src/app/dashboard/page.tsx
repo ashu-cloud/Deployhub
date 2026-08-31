@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DeployHubLogo, SketchRocket, SketchTerminalIcon, SketchLockIcon, SketchSparkle } from "@/components/SketchIcons";
-import { listProjects, createProject, Project, bootstrapSession, logout } from "@/lib/api";
+import { listProjects, createProject, Project, bootstrapSession, logout, getDeployments } from "@/lib/api";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,7 +22,13 @@ export default function DashboardPage() {
       setLoading(true);
       await bootstrapSession();
       const data = await listProjects();
-      setProjects(data);
+      const projectsWithDeployments = await Promise.all(
+        data.map(async (p) => {
+          const deps = await getDeployments(p.id);
+          return { ...p, latestDeployment: deps[0] || null } as Project & { latestDeployment: any };
+        })
+      );
+      setProjects(projectsWithDeployments as Project[]);
       setLoading(false);
     }
     load();
@@ -237,7 +243,9 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProjects.map((project, idx) => {
               const rotation = idx % 2 === 0 ? "transform -rotate-1 hover:rotate-0" : "transform rotate-1 hover:rotate-0";
-              const isLive = project.status === "active";
+              const pData = project as Project & { latestDeployment?: any };
+              const isLive = pData.latestDeployment?.status === "live";
+              const displayStatus = pData.latestDeployment?.status || project.status;
               const projName = project.repo_name || project.id;
               const subdomain = `${projName.toLowerCase().replace(/[^a-z0-9-]/g, "-")}.deployhub.dev`;
 
@@ -248,9 +256,11 @@ export default function DashboardPage() {
                   className={`doodle-border bg-surface-container p-6 relative hover:-translate-y-1.5 transition-all cursor-pointer paper-shadow flex flex-col justify-between block ${rotation}`}
                 >
                   {/* Washi-Tape Badge */}
-                  <div className="absolute -top-3 -right-2 text-[10px] font-mono font-bold px-2.5 py-0.5 border border-outline transform rotate-3 rounded bg-primary text-surface">
-                    Prod
-                  </div>
+                  {isLive && (
+                    <div className="absolute -top-3 -right-2 text-[10px] font-mono font-bold px-2.5 py-0.5 border border-outline transform rotate-3 rounded bg-primary text-surface">
+                      Prod
+                    </div>
+                  )}
 
                   <div>
                     <div className="flex justify-between items-start mb-3">
@@ -285,7 +295,7 @@ export default function DashboardPage() {
                           }`}
                         ></span>
                         <span className="text-[11px] font-bold text-primary">
-                          {isLive ? "Healthy" : project.status}
+                          {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
                         </span>
                       </div>
                       <span className="text-[11px] text-outline">

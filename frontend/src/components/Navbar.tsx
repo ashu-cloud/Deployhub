@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DeployHubLogo } from "./SketchIcons";
+import { bootstrapSession, logout, getAuthToken } from "@/lib/api";
 
 const NAV_ITEMS = [
   { id: "demo", label: "Live Demo", href: "/#demo" },
@@ -12,14 +14,27 @@ const NAV_ITEMS = [
   { id: "faq", label: "FAQ", href: "/#faq" },
 ];
 
-
-
 export default function Navbar() {
+  const router = useRouter();
   const [activeSection, setActiveSection] = useState<string>("demo");
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+
+  // Check auth state on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (getAuthToken()) {
+        setIsLoggedIn(true);
+        return;
+      }
+      const ok = await bootstrapSession();
+      setIsLoggedIn(ok);
+    };
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
-      const scrollPosition = window.scrollY + 140; // Offset for navbar height
+      const scrollPosition = window.scrollY + 140;
 
       for (let i = NAV_ITEMS.length - 1; i >= 0; i--) {
         const item = NAV_ITEMS[i];
@@ -33,20 +48,25 @@ export default function Navbar() {
         }
       }
 
-      // Default to demo if at the top
       if (window.scrollY < 300) {
         setActiveSection("demo");
       }
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll(); // Initial check on mount
+    handleScroll();
 
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const handleNavClick = (id: string) => {
     setActiveSection(id);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setIsLoggedIn(false);
+    router.push("/");
   };
 
   return (
@@ -56,7 +76,7 @@ export default function Navbar() {
           <DeployHubLogo className="h-10" />
         </Link>
 
-        {/* Desktop Navigation Links with Zig-Zag Wavy Underline Highlight */}
+        {/* Desktop Navigation Links */}
         <div className="hidden lg:flex gap-2 items-center font-mono text-sm">
           {NAV_ITEMS.map((item) => {
             const isActive = activeSection === item.id;
@@ -76,7 +96,6 @@ export default function Navbar() {
             );
           })}
         </div>
-
       </div>
 
       <div className="flex items-center gap-3 md:gap-4 animate-fade-up stagger-1">
@@ -99,24 +118,32 @@ export default function Navbar() {
           <span>Star</span>
         </a>
 
-        {/* Login CTA */}
-        <Link
-          href="/login"
-          className="doodle-btn bg-background text-sketch-white font-bold text-sm px-4 py-2 hover:bg-surface-variant transition-colors paper-shadow"
-        >
-          Sign In
-        </Link>
-
-
-        {/* Primary Deploy App Button (Commented Out) */}
-        {/* <Link
-          href="/dashboard"
-          className="bg-primary text-surface font-mono font-bold text-sm px-4 py-2 hover:bg-primary-fixed transition-transform transform -rotate-1 hover:rotate-0 doodle-border-emerald paper-shadow-emerald"
-        >
-          Deploy App ⚡
-        </Link> */}
+        {isLoggedIn ? (
+          /* Logged-in state: Dashboard link + yellow Log Out button */
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard"
+              className="doodle-btn bg-primary text-surface font-mono font-bold text-sm px-4 py-2 hover:bg-primary-fixed transition-all paper-shadow"
+            >
+              Dashboard
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="doodle-btn bg-surface text-yellow-400 font-mono font-bold text-sm px-4 py-2 hover:bg-surface-container-high border-yellow-400/40 hover:border-yellow-400 transition-all paper-shadow cursor-pointer"
+            >
+              Log Out
+            </button>
+          </div>
+        ) : (
+          /* Logged-out state: Sign In button */
+          <Link
+            href="/login"
+            className="doodle-btn bg-background text-sketch-white font-bold text-sm px-4 py-2 hover:bg-surface-variant transition-colors paper-shadow"
+          >
+            Sign In
+          </Link>
+        )}
       </div>
-
     </nav>
   );
 }
