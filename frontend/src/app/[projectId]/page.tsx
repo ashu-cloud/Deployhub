@@ -100,7 +100,7 @@ export default function ProjectOverviewPage() {
       {/* ========================================================================= */}
       {/* SIDEBAR NAVIGATION (Desktop) */}
       {/* ========================================================================= */}
-      <aside className="hidden md:flex flex-col h-screen w-64 bg-surface-container-low border-r-2 border-outline-variant p-6 sticky top-0 shrink-0 z-40 relative">
+      <aside className="hidden md:flex flex-col min-h-screen self-stretch w-64 bg-surface-container-low border-r-2 border-outline-variant p-6 sticky top-0 shrink-0 z-40 relative">
         <div className="mb-6">
           <Link href="/" className="inline-block wiggle">
             <DeployHubLogo className="h-9" />

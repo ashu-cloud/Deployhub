@@ -10,7 +10,9 @@ from app.core.db import get_db
 from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_refresh_token, get_current_user
 from app.services.github import github_service
-from app.models import User
+from app.models import User, OAuthToken
+import httpx
+import uuid
 
 router = APIRouter()
 
@@ -45,7 +47,7 @@ async def login_github():
         f"https://github.com/login/oauth/authorize"
         f"?client_id={quote(settings.GITHUB_CLIENT_ID)}"
         f"&redirect_uri={quote(settings.GITHUB_REDIRECT_URI, safe='')}"
-        f"&scope=user:email"
+        f"&scope=user:email,repo"
     )
     return RedirectResponse(url=github_auth_url)
 
@@ -70,6 +72,16 @@ async def github_callback(code: str, request: Request, response: Response, db: A
         db.add(user)
         await db.commit()
         await db.refresh(user)
+
+    # Save OAuth Token
+    token_result = await db.execute(select(OAuthToken).where(OAuthToken.user_id == user.id))
+    oauth_token = token_result.scalars().first()
+    if oauth_token:
+        oauth_token.access_token = gh_token
+    else:
+        oauth_token = OAuthToken(user_id=user.id, access_token=gh_token)
+        db.add(oauth_token)
+    await db.commit()
 
     # 4. Generate access + refresh tokens
     access_token = create_access_token(data={"sub": str(user.id)})
@@ -126,3 +138,43 @@ async def read_users_me(user_id: str = Depends(get_current_user), db: AsyncSessi
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return {"id": str(user.id), "email": user.email, "name": user.name}
+
+@router.get("/github/repos")
+async def get_github_repos(user_id: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    try:
+        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    except Exception:
+        uid = user_id
+
+    result = await db.execute(select(OAuthToken).where(OAuthToken.user_id == uid))
+    oauth_token = result.scalars().first()
+    if not oauth_token or not oauth_token.access_token:
+        raise HTTPException(status_code=401, detail="GitHub token not found. Please log in again to grant repository access.")
+    
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        response = await client.get(
+            "https://api.github.com/user/repos?sort=updated&per_page=100&type=all",
+            headers={
+                "Authorization": f"Bearer {oauth_token.access_token}",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "DeployHub-App",
+            }
+        )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Failed to fetch repositories from GitHub ({response.status_code}): {response.text}"
+            )
+        
+        repos = response.json()
+        formatted_repos = []
+        for r in repos:
+            formatted_repos.append({
+                "id": str(r.get("id")),
+                "name": r.get("name", ""),
+                "full_name": r.get("full_name", ""),
+                "desc": r.get("description") or "",
+                "updated": r.get("updated_at") or "",
+                "language": r.get("language") or "Unknown",
+            })
+        return formatted_repos

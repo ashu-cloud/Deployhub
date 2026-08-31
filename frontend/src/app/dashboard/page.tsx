@@ -83,7 +83,7 @@ export default function DashboardPage() {
       {/* ========================================================================= */}
       {/* SIDEBAR NAVIGATION (Desktop) */}
       {/* ========================================================================= */}
-      <aside className="hidden md:flex flex-col h-screen w-64 bg-surface-container-low border-r-2 border-outline-variant p-6 sticky top-0 shrink-0 z-40 relative">
+      <aside className="hidden md:flex flex-col min-h-screen self-stretch w-64 bg-surface-container-low border-r-2 border-outline-variant p-6 sticky top-0 shrink-0 z-40 relative">
         {/* Doodle: Paperclip */}
         <svg
           className="absolute top-4 -right-4 w-10 h-10 text-outline-variant rotate-12 opacity-60 z-50 pointer-events-none"
