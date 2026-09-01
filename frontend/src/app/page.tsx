@@ -13,15 +13,12 @@ import {
   SketchArrowCurved,
 } from "@/components/SketchIcons";
 import { InteractiveHeroSandbox } from "@/components/InteractiveHeroSandbox";
-// import { ArchitectureMap } from "@/components/ArchitectureMap";
 import { InteractiveRollbackDemo } from "@/components/InteractiveRollbackDemo";
 import { InteractiveFAQ } from "@/components/InteractiveFAQ";
-import { RedirectIfLoggedIn } from "@/components/RedirectIfLoggedIn";
 
 export default function Home() {
   return (
     <>
-      <RedirectIfLoggedIn />
       <WebGLBackground />
       <div className="relative z-10 flex flex-col min-h-screen">
         <Navbar />

@@ -57,22 +57,28 @@ Keep the total response under 200 words. Be specific and direct.
                 stream=True,
             )
             
+            full_diagnosis = ""
             async for chunk in stream:
                 text = chunk.choices[0].delta.content or ""
                 if text:
+                    full_diagnosis += text
                     await redis_client.publish(channel, json.dumps({
                         "type": "ai_token",
                         "text": text
                     }))
                     
             logger.info(f"AI diagnosis completed for {deployment_id}")
+            # Cache it for late-connecting clients
+            await redis_client.setex(f"build:{deployment_id}:ai_diagnosis_result", 3600, full_diagnosis)
                     
         except Exception as e:
             logger.error(f"AI diagnosis failed for {deployment_id}: {e}")
+            error_msg = f"\n\n*AI Diagnosis failed: {str(e)}*"
             await redis_client.publish(channel, json.dumps({
                 "type": "ai_token",
-                "text": f"\n\n*AI Diagnosis failed: {str(e)}*"
+                "text": error_msg
             }))
+            await redis_client.setex(f"build:{deployment_id}:ai_diagnosis_result", 3600, error_msg)
         finally:
             # Signal completion
             await redis_client.publish(channel, json.dumps({"type": "ai_done"}))

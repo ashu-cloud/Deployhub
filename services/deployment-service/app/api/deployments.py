@@ -77,6 +77,22 @@ async def websocket_deployment_logs(websocket: WebSocket, deployment_id: str, to
             "message": f"Connected to build stream for {deployment_id}"
         })
 
+        # Fetch initial status from DB
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Deployment).where(Deployment.id == UUID(deployment_id)))
+            deployment = result.scalars().first()
+            if deployment and deployment.status in ["live", "failed"]:
+                await websocket.send_json({"status": deployment.status})
+
+        # Fetch cached AI diagnosis from Redis if it exists
+        cached_ai = await redis_client.get(f"build:{deployment_id}:ai_diagnosis_result")
+        if cached_ai:
+            if isinstance(cached_ai, bytes):
+                cached_ai = cached_ai.decode("utf-8")
+            await websocket.send_json({"type": "ai_start"})
+            await websocket.send_json({"type": "ai_token", "text": cached_ai})
+            await websocket.send_json({"type": "ai_done"})
+
         while True:
             message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
             if message and message.get("data"):

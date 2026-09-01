@@ -141,11 +141,10 @@ class BuilderService:
             
             # Trigger AI Diagnosis in the background
             log_buffer = getattr(self, "current_log_buffer", [])
-            if log_buffer:
-                from app.services.ai_diagnoser import ai_diagnoser
-                asyncio.create_task(
-                    ai_diagnoser.diagnose(str(deployment_id), log_buffer, str(e))
-                )
+            from app.services.ai_diagnoser import ai_diagnoser
+            asyncio.create_task(
+                ai_diagnoser.diagnose(str(deployment_id), log_buffer, str(e))
+            )
                 
             # Publish Failure
             fail_event = BuildFailedEvent(
