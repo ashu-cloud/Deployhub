@@ -16,7 +16,7 @@ class GitHubWebhookService:
         # LocalProtocolError, which crashed the whole request/connection
         # instead of a normal 401 from GitHub). Only send the header when a
         # real token is configured; without one, GitHub API calls simply fail
-        # with 401 and we fall through to the MVP dummy-hook-id path below.
+        # with 401 and we fall through to the no-token path below.
         if settings.GITHUB_API_TOKEN:
             headers["Authorization"] = f"Bearer {settings.GITHUB_API_TOKEN}"
         self.client = httpx.AsyncClient(timeout=10.0, headers=headers)
@@ -28,15 +28,14 @@ class GitHubWebhookService:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError))
     )
-    async def register_webhook(self, owner: str, repo: str, project_id: str) -> str:
-        """Register a push webhook for the repository. Returns webhook ID."""
-        # Note: In a real app, you parse owner and repo from the repo_url
+    async def register_webhook(self, owner: str, repo: str, project_id: str) -> str | None:
+        """Register a push webhook for the repository. Returns webhook ID, or None if registration failed."""
         url = f"https://api.github.com/repos/{owner}/{repo}/hooks"
-        
+
         # We need a publicly accessible URL for GitHub to reach us.
-        # For local dev, this would be a ngrok URL.
+        # For local dev, this would be a ngrok/cloudflare-tunnel URL.
         webhook_url = f"{settings.WEBHOOK_BASE_URL.rstrip('/')}/webhooks/github/{project_id}"
-        
+
         payload = {
             "name": "web",
             "active": True,
@@ -48,22 +47,20 @@ class GitHubWebhookService:
                 "insecure_ssl": "0"
             }
         }
-        
+
         try:
             response = await self.client.post(url, json=payload)
         except httpx.HTTPError as exc:
-            # Covers auth/connection/protocol errors alike (e.g. no
-            # GITHUB_API_TOKEN configured) -- never let a GitHub API hiccup
-            # take down project creation.
+            # Covers auth/connection/protocol errors (e.g. no GITHUB_API_TOKEN) --
+            # never let a GitHub API hiccup take down project creation.
             logger.error(f"GitHub webhook registration request failed: {exc}")
-            return "dummy_hook_id_123"
+            return None
 
         if response.status_code == 201:
             return str(response.json()["id"])
-        
-        # If already exists, we might get 422. We should ideally handle that.
-        logger.error(f"Failed to register webhook: {response.text}")
-        # Returning a dummy ID for MVP if it fails (so we can test without real token)
-        return "dummy_hook_id_123"
+
+        # 422 = hook already exists; log and continue without a stored ID.
+        logger.error(f"Failed to register webhook (status={response.status_code}): {response.text}")
+        return None
 
 github_webhook_service = GitHubWebhookService()

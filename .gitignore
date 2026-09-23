@@ -13,6 +13,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+# Unblock frontend source lib — the lib/ rule above is for Python build artifacts only
+!frontend/src/lib/
 parts/
 sdist/
 var/
@@ -37,10 +39,10 @@ frontend/out/
 .next/
 node_modules/
 
-# Environment variables & secrets
+# Environment variables & secrets — NEVER commit these
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 secrets/
 
 # IDE & OS

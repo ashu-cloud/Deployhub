@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Project Service"
-    DATABASE_URL: str = "postgresql+asyncpg://deployhub:password@localhost:5432/deployhub"
+    DATABASE_URL: str  # Required — no default, must be supplied via environment
     REDIS_URL: str = "redis://localhost:6379/0"
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     # SASL/SSL settings — leave empty to use plain TCP (local dev)

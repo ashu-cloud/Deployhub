@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Auth Service"
-    DATABASE_URL: str = "postgresql+asyncpg://deployhub:password@localhost:5432/deployhub"
+    DATABASE_URL: str  # Required — no default, must be supplied via environment
     REDIS_URL: str = "redis://localhost:6379/0"
 
     GITHUB_CLIENT_ID: str = ""

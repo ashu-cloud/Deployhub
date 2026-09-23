@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List
@@ -91,7 +91,7 @@ async def delete_project(
 async def trigger_deployment(
     project_id: UUID,
     branch: str = "main",
-    commit_sha: str = "a9f8b4c",
+    commit_sha: str = Query(..., min_length=4, max_length=40, description="Git commit SHA (7–40 hex chars) or 'HEAD' for latest"),
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
