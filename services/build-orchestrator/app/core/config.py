@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     KAFKA_SASL_MECHANISM: str = ""       # e.g. PLAIN
     KAFKA_SASL_USERNAME: str = ""
     KAFKA_SASL_PASSWORD: str = ""
+    # Path to broker CA cert for TLS verification. Empty = use system CA bundle.
+    KAFKA_SSL_CAFILE: str = ""
     
     GITHUB_API_TOKEN: str = "" # Personal Access Token or GitHub App token for API calls
     GROQ_API_KEY: str = "" # Groq API Key for AI Diagnosis
@@ -17,6 +19,10 @@ class Settings(BaseSettings):
     BUILD_TIMEOUT_SECONDS: int = 600
     BUILD_MEM_LIMIT: str = "512m"
     BUILD_CPU_QUOTA: int = 100000
+    # Set to True to run build containers with NetworkMode=none (no internet).
+    # Useful when all npm packages are pre-cached in the image. Default False
+    # so that npm install can pull packages during a standard build.
+    BUILD_DISABLE_NETWORK: bool = False
 
     # Docker named volume that both this service and upload-service mount at
     # /tmp/builds. The sibling build container must bind the *volume name*

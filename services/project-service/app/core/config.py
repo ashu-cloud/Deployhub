@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     KAFKA_SASL_MECHANISM: str = ""       # e.g. PLAIN
     KAFKA_SASL_USERNAME: str = ""
     KAFKA_SASL_PASSWORD: str = ""
+    # Path to broker CA certificate file for TLS verification (SASL_SSL).
+    # Leave empty to use the system's default CA bundle (correct for public
+    # brokers like Aiven / Confluent Cloud that use a public CA).
+    KAFKA_SSL_CAFILE: str = ""
 
     GITHUB_API_TOKEN: str = "" # Personal Access Token or GitHub App token for API calls
 

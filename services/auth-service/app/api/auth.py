@@ -10,6 +10,7 @@ from app.core.db import get_db
 from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_refresh_token, get_current_user
 from app.services.github import github_service
+from app.services.encryption import encryption_service
 from app.models import User, OAuthToken
 import httpx
 import uuid
@@ -73,13 +74,14 @@ async def github_callback(code: str, request: Request, response: Response, db: A
         await db.commit()
         await db.refresh(user)
 
-    # Save OAuth Token
+    # Save OAuth Token — encrypt before persisting to protect against DB breach.
     token_result = await db.execute(select(OAuthToken).where(OAuthToken.user_id == user.id))
     oauth_token = token_result.scalars().first()
+    encrypted_token = encryption_service.encrypt(gh_token)
     if oauth_token:
-        oauth_token.access_token = gh_token
+        oauth_token.access_token = encrypted_token
     else:
-        oauth_token = OAuthToken(user_id=user.id, access_token=gh_token)
+        oauth_token = OAuthToken(user_id=user.id, access_token=encrypted_token)
         db.add(oauth_token)
     await db.commit()
 
@@ -157,15 +159,21 @@ async def get_github_repos(user_id: str = Depends(get_current_user), db: AsyncSe
         response = await client.get(
             "https://api.github.com/user/repos?sort=updated&per_page=100&type=all",
             headers={
-                "Authorization": f"Bearer {oauth_token.access_token}",
+                "Authorization": f"Bearer {encryption_service.decrypt(oauth_token.access_token)}",
                 "Accept": "application/vnd.github.v3+json",
                 "User-Agent": "DeployHub-App",
             }
         )
         if response.status_code != 200:
+            # Log the raw GitHub error server-side; return a safe generic message
+            # to the client (MED-03: prevents leaking internal API details).
+            import logging
+            logging.getLogger(__name__).error(
+                f"GitHub repos fetch failed (status={response.status_code}): {response.text}"
+            )
             raise HTTPException(
-                status_code=400, 
-                detail=f"Failed to fetch repositories from GitHub ({response.status_code}): {response.text}"
+                status_code=400,
+                detail="Failed to fetch repositories from GitHub. Please re-authenticate."
             )
         
         repos = response.json()

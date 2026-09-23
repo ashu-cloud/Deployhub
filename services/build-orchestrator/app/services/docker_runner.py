@@ -4,6 +4,17 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Minimal set of capabilities required for a Node.js npm build.
+# All others are dropped. See `man 7 capabilities` for the full list.
+_BUILD_CAP_DROP = [
+    "ALL",          # Drop everything first …
+]
+_BUILD_CAP_ADD = [
+    # … then re-grant only what npm/node genuinely needs:
+    # (none — node:20-alpine builds successfully with zero extra caps)
+]
+
+
 class DockerRunner:
     def __init__(self):
         self._docker = None
@@ -19,7 +30,17 @@ class DockerRunner:
             await self._docker.close()
 
     async def run_build_container(self, project_dir: str, env_vars: list):
-        """Runs the build inside an isolated container and returns the container instance for streaming"""
+        """Runs the build inside a hardened, isolated container and returns
+        the container instance for log streaming.
+
+        Security controls applied:
+        - CapDrop=ALL  — no Linux capabilities (npm build needs none)
+        - no-new-privileges — child processes cannot gain extra privileges
+        - PidsLimit — caps fork-bomb potential
+        - Memory + CPU limits — prevents resource exhaustion
+        - NetworkMode=bridge by default; set BUILD_DISABLE_NETWORK=true in
+          env to cut network entirely (for fully offline / pre-cached builds)
+        """
         deployment_id = project_dir.rstrip("/").split("/")[-1]
         if settings.BUILD_VOLUME_NAME:
             # Sibling containers started via the host docker.sock cannot see
@@ -30,28 +51,38 @@ class DockerRunner:
             binds = [f"{project_dir}:/app"]
             working_dir = "/app"
 
+        network_mode = "none" if settings.BUILD_DISABLE_NETWORK else "bridge"
+
         config = {
             "Image": "node:20-alpine",
             "Cmd": ["sh", "-c", "if [ -f package-lock.json ]; then npm ci; else npm install; fi && npm run build"],
             "Env": env_vars,
             "HostConfig": {
-                "Memory": 512 * 1024 * 1024, # 512MB limit
-                "NanoCPUs": int(settings.BUILD_CPU_QUOTA * 1e9 / 100000), # ~1 CPU core
+                "Memory": 512 * 1024 * 1024,              # 512 MB hard limit
+                "MemorySwap": 512 * 1024 * 1024,          # disable swap (same as Memory)
+                "NanoCPUs": int(settings.BUILD_CPU_QUOTA * 1e9 / 100000),
+                "PidsLimit": 256,                          # block fork bombs
                 "Binds": binds,
-                "AutoRemove": False # We remove manually after streaming logs
+                "AutoRemove": False,                       # removed manually after log streaming
+                "NetworkMode": network_mode,
+                # Security hardening ─────────────────────────────────────────
+                "CapDrop": _BUILD_CAP_DROP,                # drop ALL Linux capabilities
+                "CapAdd": _BUILD_CAP_ADD,                  # add back none
+                "SecurityOpt": ["no-new-privileges=true"], # child procs can't gain privs
+                # ─────────────────────────────────────────────────────────────
             },
             "WorkingDir": working_dir,
             "Tty": False,
             "AttachStdout": True,
             "AttachStderr": True,
         }
-        
-        logger.info(f"Creating Docker container for {project_dir}")
+
+        logger.info(f"Creating hardened Docker container for {project_dir} (network={network_mode})")
         try:
-            # Pull image if not exists (in production, we'd pre-pull or build our own images)
-            # await self.docker.images.pull("node:20-alpine")
-            
-            container = await self.docker.containers.create_or_replace(config=config, name=f"build-{project_dir.split('/')[-1]}")
+            container = await self.docker.containers.create_or_replace(
+                config=config,
+                name=f"build-{deployment_id}",
+            )
             await container.start()
             return container
         except Exception as e:

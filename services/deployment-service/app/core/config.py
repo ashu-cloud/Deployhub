@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     KAFKA_SASL_MECHANISM: str = ""       # e.g. PLAIN
     KAFKA_SASL_USERNAME: str = ""
     KAFKA_SASL_PASSWORD: str = ""
+    # Path to broker CA cert for TLS verification. Empty = use system CA bundle.
+    KAFKA_SSL_CAFILE: str = ""
 
     # Caddy's admin API is not published on any network interface. It is
     # reachable only over a filesystem-shared Unix socket between the caddy

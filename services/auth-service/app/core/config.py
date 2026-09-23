@@ -7,6 +7,10 @@ class Settings(BaseSettings):
 
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
+    # AES-256-GCM key used to encrypt GitHub OAuth tokens before DB storage.
+    # Must be a 64-char hex string (32 bytes). Generate with:
+    #   python -c "import secrets; print(secrets.token_hex(32))"
+    OAUTH_TOKEN_ENCRYPTION_KEY: str  # Required — no default
 
     # RS256: this service holds the private key and signs tokens; every other
     # service only ever needs the public key to verify them. Keys are never

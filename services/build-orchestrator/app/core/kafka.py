@@ -21,9 +21,12 @@ class KafkaClient:
                 "sasl_plain_password": settings.KAFKA_SASL_PASSWORD,
             }
             if sasl_kwargs["security_protocol"] == "SASL_SSL":
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
+                # Build a proper TLS context — certificate verification is ENABLED.
+                # If the broker uses a self-signed or private CA, set KAFKA_SSL_CAFILE
+                # to the path of that CA certificate inside the container.
+                cafile = settings.KAFKA_SSL_CAFILE or None
+                ctx = ssl.create_default_context(cafile=cafile)
+                # We intentionally do NOT disable check_hostname or set CERT_NONE.
                 sasl_kwargs["ssl_context"] = ctx
         # Start Producer
         self.producer = AIOKafkaProducer(
