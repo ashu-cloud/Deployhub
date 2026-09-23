@@ -9,6 +9,7 @@ class KafkaClient:
     def __init__(self):
         self.producer = None
         self.consumer = None
+        self._consume_task = None
 
     async def start(self, message_handler=None):
         sasl_kwargs = {}
@@ -53,7 +54,13 @@ class KafkaClient:
             logger.info("Kafka consumer started")
             # Fire and forget consumer loop
             import asyncio
-            asyncio.create_task(self._consume_loop(message_handler))
+            self._consume_task = asyncio.create_task(self._consume_loop(message_handler))
+            
+            # QUAL-02: Prevent garbage collection and log silent crashes
+            def _on_task_done(t):
+                if not t.cancelled() and t.exception():
+                    logger.error(f"Kafka consumer task died: {t.exception()}")
+            self._consume_task.add_done_callback(_on_task_done)
 
     async def _consume_loop(self, handler):
         try:
@@ -71,6 +78,8 @@ class KafkaClient:
             logger.error(f"Kafka consumer error: {e}")
 
     async def stop(self):
+        if self._consume_task:
+            self._consume_task.cancel()
         if self.consumer:
             await self.consumer.stop()
         if self.producer:

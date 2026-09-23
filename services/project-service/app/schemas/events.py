@@ -9,4 +9,4 @@ class BuildQueuedEvent(BaseModel):
     git_commit: str
     git_branch: str
     repo_url: str
-    timestamp: datetime = datetime.utcnow()
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

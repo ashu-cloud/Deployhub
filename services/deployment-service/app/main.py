@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.db import engine, Base, AsyncSessionLocal
 from app.core.kafka import kafka_client
@@ -16,7 +16,17 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-async def process_deployment_uploaded(payload: dict):
+async def process_kafka_event(topic: str, payload: dict):
+    if topic == "deployment.uploaded":
+        await _handle_deployment_uploaded(payload)
+    elif topic == "build.failed":
+        await _handle_build_failed(payload)
+    elif topic == "domain.added":
+        await _handle_domain_added(payload)
+    elif topic == "domain.removed":
+        await _handle_domain_removed(payload)
+
+async def _handle_deployment_uploaded(payload: dict):
     deployment_id = payload.get("deployment_id")
     project_id = payload.get("project_id")
     s3_path = payload.get("s3_path")
@@ -38,7 +48,7 @@ async def process_deployment_uploaded(payload: dict):
             deployment = result.scalars().first()
             if deployment:
                 deployment.status = 'live'
-                deployment.deployed_at = datetime.utcnow()
+                deployment.deployed_at = datetime.now(timezone.utc)
                 await db.commit()
 
             # 3. Add Custom Domain Routes
@@ -70,12 +80,55 @@ async def process_deployment_uploaded(payload: dict):
     except Exception as e:
         logger.error(f"Failed to make deployment live {deployment_id}: {e}")
 
+async def _handle_build_failed(payload: dict):
+    deployment_id = payload.get("deployment_id")
+    logger.info(f"Processing build.failed for {deployment_id}")
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Deployment).where(Deployment.id == deployment_id))
+            deployment = result.scalars().first()
+            if deployment:
+                deployment.status = 'failed'
+                await db.commit()
+        await redis_client.publish(
+            f"deployment:{deployment_id}:status",
+            json.dumps({"status": "failed", "error": "Build process failed"})
+        )
+    except Exception as e:
+        logger.error(f"Error handling build.failed for {deployment_id}: {e}")
+
+async def _handle_domain_added(payload: dict):
+    project_id = payload.get("project_id")
+    domain = payload.get("domain")
+    logger.info(f"Adding custom domain route {domain} for project {project_id}")
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(Deployment).where(Deployment.project_id == project_id, Deployment.status == 'live')
+            )
+            live_deployment = result.scalars().first()
+            if live_deployment and live_deployment.s3_path:
+                await caddy_manager.add_custom_domain_route(domain, live_deployment.s3_path)
+    except Exception as e:
+        logger.error(f"Error adding custom domain route for {domain}: {e}")
+
+async def _handle_domain_removed(payload: dict):
+    domain = payload.get("domain")
+    logger.info(f"Removing custom domain route {domain}")
+    try:
+        await caddy_manager.remove_custom_domain_route(domain)
+    except Exception as e:
+        logger.error(f"Error removing custom domain route for {domain}: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
-    await kafka_client.start(message_handler=process_deployment_uploaded)
+    await kafka_client.start(
+        topics=["deployment.uploaded", "build.failed", "domain.added", "domain.removed"],
+        message_handler=process_kafka_event
+    )
     yield
     await kafka_client.stop()
 
@@ -96,6 +149,8 @@ async def security_headers(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
     return response
 
 @app.get("/health")

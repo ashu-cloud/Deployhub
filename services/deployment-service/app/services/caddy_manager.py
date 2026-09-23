@@ -124,4 +124,40 @@ class CaddyManager:
             logger.error(f"Failed to communicate with Caddy for custom domain: {e}")
             raise
 
+    async def remove_custom_domain_route(self, domain: str):
+        """
+        Removes the host route for a custom domain from Caddy.
+        """
+        try:
+            # 1. Fetch all routes
+            resp = await self.client.get("/config/apps/http/servers/srv0/routes")
+            if resp.status_code == 404:
+                return # No routes exist
+            resp.raise_for_status()
+            routes = resp.json() or []
+            
+            # 2. Find the index of the route matching this domain
+            target_index = -1
+            for i, route in enumerate(routes):
+                match = route.get("match", [{}])[0]
+                hosts = match.get("host", [])
+                if domain in hosts:
+                    target_index = i
+                    break
+            
+            # 3. Delete the route if found
+            if target_index != -1:
+                del_resp = await self.client.delete(f"/config/apps/http/servers/srv0/routes/{target_index}")
+                del_resp.raise_for_status()
+                logger.info(f"Successfully removed Caddy custom domain route for {domain}")
+            else:
+                logger.warning(f"Could not find Caddy route to remove for custom domain: {domain}")
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Caddy API error removing custom domain: {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to communicate with Caddy removing custom domain: {e}")
+            raise
+
 caddy_manager = CaddyManager()

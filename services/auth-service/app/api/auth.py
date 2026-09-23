@@ -14,8 +14,24 @@ from app.services.encryption import encryption_service
 from app.models import User, OAuthToken
 import httpx
 import uuid
+import secrets
+from redis.asyncio import from_url
 
 router = APIRouter()
+
+redis_client = from_url(settings.REDIS_URL, decode_responses=True)
+
+async def check_rate_limit(request: Request):
+    client_ip = request.client.host
+    endpoint = request.url.path
+    key = f"rate_limit:{endpoint}:{client_ip}"
+    
+    # QUAL-07: Atomic INCR and conditional EXPIRE
+    current = await redis_client.incr(key)
+    if current == 1:
+        await redis_client.expire(key, 60)
+    if current > 10: # 10 requests per minute
+        raise HTTPException(status_code=429, detail="Too many requests")
 
 REFRESH_COOKIE_NAME = "refresh_token"
 
@@ -43,17 +59,34 @@ def _wants_html(request: Request) -> bool:
 
 
 @router.get("/github")
-async def login_github():
+async def login_github(response: Response):
+    state = secrets.token_urlsafe(32)
     github_auth_url = (
         f"https://github.com/login/oauth/authorize"
         f"?client_id={quote(settings.GITHUB_CLIENT_ID)}"
         f"&redirect_uri={quote(settings.GITHUB_REDIRECT_URI, safe='')}"
         f"&scope=user:email,repo"
+        f"&state={state}"
     )
-    return RedirectResponse(url=github_auth_url)
+    redirect = RedirectResponse(url=github_auth_url)
+    redirect.set_cookie(
+        key="oauth_state",
+        value=state,
+        httponly=True,
+        secure=True,
+        samesite="lax",  # Must be lax for cross-site redirect back
+        max_age=600,     # 10 minutes
+        path="/",
+    )
+    return redirect
 
 @router.get("/callback")
-async def github_callback(code: str, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+async def github_callback(code: str, state: str, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    # Verify state parameter to prevent CSRF
+    cookie_state = request.cookies.get("oauth_state")
+    if not cookie_state or cookie_state != state:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state. Please try logging in again.")
+    
     # 1. Get Access Token
     gh_token = await github_service.get_access_token(code)
     
@@ -108,7 +141,7 @@ async def github_callback(code: str, request: Request, response: Response, db: A
         return redirect
     return payload
 
-@router.post("/refresh")
+@router.post("/refresh", dependencies=[Depends(check_rate_limit)])
 async def refresh_access_token(request: Request, response: Response):
     token = request.cookies.get(REFRESH_COOKIE_NAME)
     if not token:
@@ -130,7 +163,7 @@ async def refresh_access_token(request: Request, response: Response):
 
     return {"access_token": new_access_token, "token_type": "bearer"}
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[Depends(check_rate_limit)])
 async def logout(response: Response):
     response.delete_cookie(REFRESH_COOKIE_NAME, path="/")
     return {"message": "Logged out"}

@@ -37,8 +37,9 @@ async def test_webhook_success_and_idempotency(
     mock_settings.WEBHOOK_SECRET = "test_secret"
     # Setup mocks
     mock_kafka.send_event = AsyncMock()
-    mock_redis.get = AsyncMock(return_value=None) # Not processed yet
-    mock_redis.setex = AsyncMock()
+    # Mock redis.set to return True for the lock claim
+    mock_redis.set = AsyncMock(return_value=True)
+    mock_redis.delete = AsyncMock()
     
     # We mock the DB call to find the project
     mock_session = AsyncMock()
@@ -50,6 +51,7 @@ async def test_webhook_success_and_idempotency(
     mock_project.webhook_secret = "test_secret"
     mock_scalars.first.return_value = mock_project
     mock_result.scalars.return_value = mock_scalars
+    mock_result.scalar.return_value = 5 # Return 5 for count() query
     mock_session.execute.return_value = mock_result
     
     async def mock_refresh(obj):
@@ -72,8 +74,8 @@ async def test_webhook_success_and_idempotency(
     mock_kafka.send_event.assert_called_once()
     
     # 2. Second request -> Idempotent
-    # Simulate redis now returning the cached ID
-    mock_redis.get = AsyncMock(return_value=b"1")
+    # Simulate redis returning None for the claim (duplicate)
+    mock_redis.set = AsyncMock(return_value=None)
     mock_kafka.send_event.reset_mock()
     
     response = client.post("/webhooks/github/c1341c4e-9790-4fe9-a87f-dd4694ca7508", content=webhook_payload, headers=headers)

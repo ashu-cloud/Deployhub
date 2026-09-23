@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.redis import redis_client
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class LogStreamer:
                     payload = {
                         "line": line,
                         "line_number": line_number,
-                        "ts": datetime.utcnow().isoformat()
+                        "ts": datetime.now(timezone.utc).isoformat()
                     }
                     await redis_client.publish(channel, json.dumps(payload))
                     # In a real app, also publish to Kafka for archival
@@ -48,7 +48,7 @@ class LogStreamer:
             await redis_client.publish(channel, json.dumps({
                 "line": error_line,
                 "line_number": line_number + 1,
-                "ts": datetime.utcnow().isoformat()
+                "ts": datetime.now(timezone.utc).isoformat()
             }))
             
         return log_buffer

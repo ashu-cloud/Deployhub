@@ -76,6 +76,7 @@ class BuilderService:
             return
             
         logger.info(f"Starting build orchestration for deployment {deployment_id}")
+        log_buffer = []
         
         # 1. Acquire Distributed Lock
         try:
@@ -120,8 +121,6 @@ class BuilderService:
                 log_buffer = await stream_task
                 
                 if exit_code != 0:
-                    # Stash log buffer for exception handler
-                    self.current_log_buffer = log_buffer
                     raise Exception(f"Build container exited with code {exit_code}")
                 
                 # 6. Publish Success
@@ -140,11 +139,17 @@ class BuilderService:
             logger.error(f"Build failed for {deployment_id}: {e}")
             
             # Trigger AI Diagnosis in the background
-            log_buffer = getattr(self, "current_log_buffer", [])
             from app.services.ai_diagnoser import ai_diagnoser
-            asyncio.create_task(
+            
+            # QUAL-02: Keep a reference to background tasks
+            if not hasattr(self, '_background_tasks'):
+                self._background_tasks = set()
+                
+            diag_task = asyncio.create_task(
                 ai_diagnoser.diagnose(str(deployment_id), log_buffer, str(e))
             )
+            self._background_tasks.add(diag_task)
+            diag_task.add_done_callback(self._background_tasks.discard)
                 
             # Publish Failure
             fail_event = BuildFailedEvent(

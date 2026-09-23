@@ -17,5 +17,5 @@ class Deployment(Base):
     s3_path = Column(String(500))
     deployment_number = Column(Integer, nullable=False)
     deployed_at = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     version = Column(Integer, nullable=False, default=0) # For optimistic locking

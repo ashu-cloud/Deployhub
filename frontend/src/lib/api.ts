@@ -39,6 +39,15 @@ export interface EnvVar {
   created_at: string;
 }
 
+export interface GitHubRepo {
+  id: string;
+  name: string;
+  full_name: string;
+  desc: string;
+  updated: string;
+  language: string;
+}
+
 // The access token lives in memory only for the lifetime of this module --
 // never in localStorage/sessionStorage, which would leave it readable by any
 // injected script (XSS) for as long as the browser keeps the storage around.
@@ -274,7 +283,7 @@ export async function rollbackDeployment(deploymentId: string): Promise<{ succes
   return { success: true, message: data.message || "Rollback successful" };
 }
 
-export async function getGithubRepos(): Promise<any[]> {
+export async function getGithubRepos(): Promise<GitHubRepo[]> {
   try {
     const res = await fetchWithAuth("/api/v1/auth/github/repos");
     if (res.ok) {

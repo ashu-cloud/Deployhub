@@ -32,7 +32,8 @@ class EnvVarResponse(BaseModel):
         from_attributes = True
 
 class CustomDomainCreate(BaseModel):
-    domain: str = Field(..., min_length=3, max_length=255)
+    # Matches a valid hostname or FQDN (e.g. sub.domain.com)
+    domain: str = Field(..., min_length=3, max_length=255, pattern=r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$")
 
 class CustomDomainResponse(BaseModel):
     id: UUID

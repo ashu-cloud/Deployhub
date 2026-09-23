@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from typing import List
 from uuid import UUID
 import re
@@ -11,6 +12,8 @@ from app.core.rate_limit import rate_limit_create_project
 from app.models import Project
 from app.schemas.project import ProjectCreate, ProjectResponse
 from app.services.github import github_webhook_service
+import asyncio
+import httpx
 
 router = APIRouter()
 
@@ -104,9 +107,9 @@ async def trigger_deployment(
     from app.schemas.events import BuildQueuedEvent
     from app.core.kafka import kafka_client
 
-    # Count existing deployments to compute deployment_number
-    dep_count_res = await db.execute(select(Deployment).where(Deployment.project_id == project_id))
-    count = len(dep_count_res.scalars().all())
+    # Count existing deployments to compute deployment_number (fixes BROKEN-06)
+    count_query = await db.execute(select(func.count(Deployment.id)).where(Deployment.project_id == project_id))
+    count = count_query.scalar() or 0
 
     new_dep = Deployment(
         project_id=project_id,
@@ -150,6 +153,22 @@ async def trigger_deployment(
 from app.schemas.project import CustomDomainCreate, CustomDomainResponse
 from app.models import CustomDomain
 
+async def _verify_txt_record(domain: str, expected_value: str) -> bool:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "nslookup", "-q=TXT", domain,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode == 0:
+            output = stdout.decode("utf-8", errors="ignore")
+            if expected_value in output:
+                return True
+    except Exception:
+        pass
+    return False
+
 @router.post("/{project_id}/domains", response_model=CustomDomainResponse, status_code=status.HTTP_201_CREATED)
 async def add_custom_domain(
     project_id: UUID,
@@ -168,19 +187,34 @@ async def add_custom_domain(
     if domain_check.scalars().first():
         raise HTTPException(status_code=400, detail="Domain is already attached to a project")
 
+    # Verify domain ownership via TXT record
+    expected_txt = f"deployhub-verification={project_id}"
+    is_verified = await _verify_txt_record(domain_in.domain, expected_txt)
+    
+    if not is_verified:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Domain verification failed. Please add a TXT record to {domain_in.domain} with value: {expected_txt}"
+        )
+
     # Add domain
     new_domain = CustomDomain(
         project_id=project_id,
         domain=domain_in.domain,
-        verified=True  # For MVP, assume verified. In real app, we'd verify DNS.
+        verified=True
     )
     db.add(new_domain)
     await db.commit()
     await db.refresh(new_domain)
 
-    # In a full production system, we'd fire an event to deployment-service here
-    # to add this domain to Caddy for the currently live deployment.
-    # We will handle it on next deployment for simplicity of this MVP, or we can trigger a re-sync.
+    # Trigger deployment-service to add Caddy route if project has a live deployment
+    # Using Kafka to broadcast the domain addition
+    from app.core.kafka import kafka_client
+    await kafka_client.send_event(
+        topic="domain.added",
+        value={"project_id": str(project_id), "domain": domain_in.domain},
+        key=str(project_id)
+    )
     
     return new_domain
 
@@ -216,4 +250,12 @@ async def delete_custom_domain(
 
     await db.delete(db_domain)
     await db.commit()
+
+    # Broadcast removal so deployment-service drops the route
+    from app.core.kafka import kafka_client
+    await kafka_client.send_event(
+        topic="domain.removed",
+        value={"project_id": str(project_id), "domain": db_domain.domain},
+        key=str(project_id)
+    )
 

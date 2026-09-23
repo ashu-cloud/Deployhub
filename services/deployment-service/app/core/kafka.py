@@ -9,8 +9,11 @@ class KafkaClient:
     def __init__(self):
         self.producer = None
         self.consumer = None
+        self._consume_task = None
 
-    async def start(self, message_handler=None):
+    async def start(self, topics: list = None, message_handler=None):
+        if topics is None:
+            topics = ["deployment.uploaded"]
         sasl_kwargs = {}
         if settings.KAFKA_SASL_USERNAME:
             import ssl
@@ -39,9 +42,9 @@ class KafkaClient:
         await self.producer.start()
 
         # Start Consumer
-        if message_handler:
+        if message_handler and topics:
             self.consumer = AIOKafkaConsumer(
-                "deployment.uploaded",
+                *topics,
                 bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
                 group_id="deployment-service-cg",
                 enable_auto_commit=False,
@@ -50,14 +53,20 @@ class KafkaClient:
             )
             await self.consumer.start()
             import asyncio
-            asyncio.create_task(self._consume_loop(message_handler))
+            self._consume_task = asyncio.create_task(self._consume_loop(message_handler))
+            
+            # QUAL-02: Prevent garbage collection and log silent crashes
+            def _on_task_done(t):
+                if not t.cancelled() and t.exception():
+                    logger.error(f"Kafka consumer task died: {t.exception()}")
+            self._consume_task.add_done_callback(_on_task_done)
 
     async def _consume_loop(self, handler):
         try:
             async for msg in self.consumer:
-                logger.info(f"Received deployment.uploaded event for project: {msg.key.decode('utf-8') if msg.key else 'None'}")
+                logger.info(f"Received {msg.topic} event for project: {msg.key.decode('utf-8') if msg.key else 'None'}")
                 try:
-                    await handler(msg.value)
+                    await handler(msg.topic, msg.value)
                     await self.consumer.commit()
                 except Exception as e:
                     logger.error(f"Error processing deployment: {e}")
@@ -65,6 +74,8 @@ class KafkaClient:
             logger.error(f"Kafka consumer error: {e}")
 
     async def stop(self):
+        if self._consume_task:
+            self._consume_task.cancel()
         if self.consumer:
             await self.consumer.stop()
         if self.producer:

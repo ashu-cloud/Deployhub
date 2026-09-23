@@ -41,4 +41,7 @@ class GitHubService:
             
         return response.json()
 
+    async def close(self):
+        await self.http_client.aclose()
+
 github_service = GitHubService()

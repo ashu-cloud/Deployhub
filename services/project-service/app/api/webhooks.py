@@ -5,6 +5,7 @@ import json
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 
 from app.core.config import settings
 from app.core.db import get_db
@@ -72,13 +73,19 @@ async def receive_webhook(
         if not commit_sha or commit_sha == "0000000000000000000000000000000000000000":
             return {"status": "ignored", "reason": "branch deletion"}
 
+        # Calculate deployment number using COUNT (fixes BROKEN-04 and BROKEN-06)
+        count_query = await db.execute(
+            select(func.count(Deployment.id)).where(Deployment.project_id == project_id)
+        )
+        count = count_query.scalar() or 0
+
         # 3. Create Deployment record
         deployment = Deployment(
             project_id=project_id,
             git_commit=commit_sha,
             git_branch=branch,
             status="queued",
-            deployment_number=1 # In real app, calculate this
+            deployment_number=count + 1
         )
         db.add(deployment)
         await db.commit()

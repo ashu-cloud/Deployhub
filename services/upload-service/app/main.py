@@ -73,7 +73,27 @@ async def process_build_completed(payload: dict):
         
     except Exception as e:
         logger.error(f"Upload failed for deployment {deployment_id}: {e}")
-        # Could publish upload.failed here if we had that event
+        try:
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(Deployment).where(Deployment.id == deployment_id))
+                deployment = result.scalars().first()
+                if deployment:
+                    deployment.status = 'failed'
+                    await db.commit()
+            
+            # Inform the rest of the system
+            event = {"deployment_id": deployment_id, "project_id": project_id, "error": str(e)}
+            await kafka_client.send_event("build.failed", event, key=project_id)
+            
+            # Inform the frontend via Redis PubSub
+            import json
+            from app.core.redis import redis_client
+            await redis_client.publish(
+                f"deployment:{deployment_id}:status",
+                json.dumps({"status": "failed", "error": f"Upload failed: {str(e)}"})
+            )
+        except Exception as recovery_err:
+            logger.error(f"Failed to run recovery path for {deployment_id}: {recovery_err}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -92,6 +112,16 @@ async def lifespan(app: FastAPI):
     await kafka_client.stop()
 
 app = FastAPI(title="DeployHub Upload Service", lifespan=lifespan)
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    return response
 
 @app.get("/health")
 async def health():

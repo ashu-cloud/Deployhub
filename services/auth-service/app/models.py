@@ -12,7 +12,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     github_id = Column(Integer, unique=True, nullable=False)
     name = Column(String(255))
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class OAuthToken(Base):
     __tablename__ = "oauth_tokens"

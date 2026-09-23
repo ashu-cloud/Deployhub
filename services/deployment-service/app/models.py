@@ -16,7 +16,7 @@ class Deployment(Base):
     s3_path = Column(String(500))
     deployment_number = Column(Integer, nullable=False)
     deployed_at = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     version = Column(Integer, nullable=False, default=0)
 
 class Project(Base):
@@ -34,7 +34,7 @@ class Project(Base):
     repo_url = Column(String(500), nullable=False)
     github_webhook_id = Column(String(100))
     status = Column(String(50), default="active")
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class CustomDomain(Base):
     __tablename__ = "custom_domains"
@@ -43,4 +43,4 @@ class CustomDomain(Base):
     domain = Column(String(255), unique=True, nullable=False)
     verified = Column(Boolean, default=False)
     ssl_cert_id = Column(String(100))
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

@@ -18,32 +18,46 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/deployments", tags=["Deployments"])
 
 @router.get("/{project_id}")
-async def get_deployments(project_id: UUID, user_id: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_deployments(
+    project_id: UUID, 
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    user_id: str = Depends(get_current_user), 
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
-        select(Deployment).where(Deployment.project_id == project_id).order_by(Deployment.created_at.desc())
+        select(Deployment).where(Deployment.project_id == project_id).order_by(Deployment.created_at.desc()).limit(limit).offset(offset)
     )
     deployments = result.scalars().all()
     return deployments
 
 @router.get("/detail/{deployment_id}")
 async def get_deployment_detail(deployment_id: UUID, user_id: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Deployment).where(Deployment.id == deployment_id))
+    result = await db.execute(
+        select(Deployment).join(Project, Deployment.project_id == Project.id)
+        .where(Deployment.id == deployment_id, Project.user_id == user_id)
+    )
     deployment = result.scalars().first()
     if not deployment:
-        raise HTTPException(status_code=404, detail="Deployment not found")
+        raise HTTPException(status_code=404, detail="Deployment not found or access denied")
     return deployment
 
 @router.post("/{deployment_id}/rollback")
 async def rollback_deployment(deployment_id: UUID, user_id: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    # 1. Fetch deployment to rollback TO
-    result = await db.execute(select(Deployment).where(Deployment.id == deployment_id))
-    deployment = result.scalars().first()
-    if not deployment or deployment.status != 'live':
-        raise HTTPException(status_code=400, detail="Deployment not found or not live")
+    # 1. Fetch deployment to rollback TO and ensure ownership
+    result = await db.execute(
+        select(Deployment, Project).join(Project, Deployment.project_id == Project.id)
+        .where(Deployment.id == deployment_id, Project.user_id == user_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=400, detail="Deployment not found, not owned by user, or project missing")
+    
+    deployment, project = row
+    if deployment.status != 'live':
+        raise HTTPException(status_code=400, detail="Can only rollback to a 'live' deployment state")
 
     # 2. Re-route Caddy using the same subdomain scheme as a live deploy
-    proj_res = await db.execute(select(Project).where(Project.id == deployment.project_id))
-    project = proj_res.scalars().first()
     subdomain = project.repo_name if project else f"project-{deployment.project_id}"
     await caddy_manager.add_route(subdomain, deployment.s3_path)
 
